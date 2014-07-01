@@ -18,6 +18,7 @@ action :apply do
     nginx_base = ::File.join('/','etc','nginx')
     avail = ::File.join(nginx_base,'sites-available',r.name)
     template avail do
+      variables r.variables if r.variables
       notifies :configtest, svc, :delayed
       notifies :reload, svc, :delayed
     end
