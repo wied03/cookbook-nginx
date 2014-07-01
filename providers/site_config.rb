@@ -11,11 +11,15 @@ def get_site_config_files
 end
 
 action :create_or_update do
-  svc = service 'nginx config reload' do
+  svc_reload = service 'nginx config reload' do
     service_name 'nginx'
     supports :reload => true, :configtest => true
     action :nothing
     only_if 'service nginx status'
+  end
+  configtest = bash 'nginx config test' do
+    code 'service nginx configtest'
+    action :nothing
   end
   valid_sites = []
   nginx_base = ::File.join('/', 'etc', 'nginx')
@@ -27,8 +31,9 @@ action :create_or_update do
     valid_sites << template_without_extension
     template avail do
       variables new_resource.variables if new_resource.variables
-      notifies :configtest, svc, :delayed
-      notifies :reload, svc, :delayed
+      notifies :run, configtest, :delayed
+      notifies :reload, svc_reload, :delayed
+      source ::File.join(node.chef_environment, 'sites', "#{::File.basename(name)}.erb")
     end
     link_path = ::File.join(link_dir, template_without_extension)
     link link_path do
@@ -36,7 +41,8 @@ action :create_or_update do
       action :create
     end
   end
-  invalid_sites = ::Dir.entries(avail_dir) - valid_sites
+  dir_returns_these_but_we_dont_care_about_them = ['.', '..']
+  invalid_sites = ::Dir.entries(avail_dir) - dir_returns_these_but_we_dont_care_about_them - valid_sites
   invalid_sites.each do |site|
     link ::File.join(link_dir, site) do
       action :delete
