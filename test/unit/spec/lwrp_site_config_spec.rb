@@ -22,12 +22,7 @@ describe 'naemon::lwrp:service' do
   end
 
   def setup_recipe(contents)
-    temp_lwrp_recipe contents + <<-EOF
-      # Simulate an immediate apply in order to test the template
-      nginx_site_config 'application' do
-        action :apply
-      end
-    EOF
+    temp_lwrp_recipe contents
   end
 
   it 'sets up the template to be done at the end of the chef run' do
@@ -41,20 +36,23 @@ describe 'naemon::lwrp:service' do
     expect(resource).to notify('nginx_site_config[apply]').to(:apply).delayed
   end
 
-  it 'works properly with no variables' do
+  it 'works properly with no variables and 1 site' do
     # arrange
     setup_recipe <<-EOF
         nginx_site_config 'site1'
     EOF
 
     # act + assert
+    expect(@chef_run.find_resources('template')).to have(1).items
     resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site1')
-    expect(resource.variables).to be_nil
+    expect(resource.variables).to eq({})
     expect(resource).to notify('service[nginx]').to(:configtest).delayed
-    expect(@chef_run).to create_link('/etc/nginx/sites-enabled/site1').with(to: '/etc/nginx/sites-available/site1')
+    expect(resource).to notify('service[nginx]').to(:reload).delayed
+    resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site1')
+    expect(resource.to).to eq('/etc/nginx/sites-available/site1')
   end
 
-  it 'works properly with variables' do
+  it 'works properly with variables and 1 site' do
     # arrange
     setup_recipe <<-EOF
             nginx_site_config 'site1' do
@@ -63,8 +61,29 @@ describe 'naemon::lwrp:service' do
     EOF
 
     # act + assert
+    expect(@chef_run.find_resources('template')).to have(1).items
     resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site1')
     expect(resource.variables).to eq(:stuff => 'foobar')
+    expect(resource).to notify('service[nginx]').to(:configtest).delayed
+    expect(resource).to notify('service[nginx]').to(:reload).delayed
+    resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site1')
+    expect(resource.to).to eq('/etc/nginx/sites-available/site1')
+  end
+
+  it 'works properly with multiple sites' do
+    # arrange
+    setup_recipe <<-EOF
+      nginx_site_config 'site1'
+      nginx_site_config 'site2'
+    EOF
+
+    # act + assert
+    expect(@chef_run.find_resources('template')).to have(2).items
+    resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site1')
+    expect(resource.variables).to be_nil
+    expect(resource).to notify('service[nginx]').to(:configtest).delayed
+    resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site2')
+    expect(resource.variables).to be_nil
     expect(resource).to notify('service[nginx]').to(:configtest).delayed
     expect(@chef_run).to create_link('/etc/nginx/sites-enabled/site1').with(to: '/etc/nginx/sites-available/site1')
   end
