@@ -35,6 +35,24 @@ describe 'naemon::lwrp:service' do
     temp_lwrp_recipe contents
   end
 
+  it 'defines a service resource correctly' do
+    # arrange
+    Dir.stub(:entries).and_call_original
+    Dir.stub(:entries).with('/etc/nginx/sites-enabled').and_return []
+    Dir.stub(:entries).with('/etc/nginx/sites-available').and_return []
+    setup_recipe 'site1', <<-EOF
+      bsw_nginx_site_config 'site config'
+    EOF
+
+    # act + assert
+    resource = @chef_run.find_resource 'service', 'nginx config reload'
+    expect(resource).to_not be_nil
+    expect(resource.service_name).to eq 'nginx'
+    expect(resource.action).to eq [:nothing]
+    expect(resource.supports).to eq :reload => true, :configtest => true
+    expect(resource.only_if.map {|c| c.command}).to eq ['service nginx status']
+  end
+
   it 'works properly with no variables and 1 site' do
     # arrange
     Dir.stub(:entries).and_call_original
@@ -48,8 +66,8 @@ describe 'naemon::lwrp:service' do
     expect(@chef_run.find_resources('template')).to have(1).items
     resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site1')
     expect(resource.variables).to eq({})
-    expect(resource).to notify('service[nginx]').to(:configtest).delayed
-    expect(resource).to notify('service[nginx]').to(:reload).delayed
+    expect(resource).to notify('service[nginx config reload]').to(:configtest).delayed
+    expect(resource).to notify('service[nginx config reload]').to(:reload).delayed
     resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site1')
     expect(resource.to).to eq('/etc/nginx/sites-available/site1')
   end
@@ -69,8 +87,8 @@ describe 'naemon::lwrp:service' do
     expect(@chef_run.find_resources('template')).to have(1).items
     resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site1')
     expect(resource.variables).to eq(:stuff => 'foobar')
-    expect(resource).to notify('service[nginx]').to(:configtest).delayed
-    expect(resource).to notify('service[nginx]').to(:reload).delayed
+    expect(resource).to notify('service[nginx config reload]').to(:configtest).delayed
+    expect(resource).to notify('service[nginx config reload]').to(:reload).delayed
     resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site1')
     expect(resource.to).to eq('/etc/nginx/sites-available/site1')
   end
@@ -88,14 +106,14 @@ describe 'naemon::lwrp:service' do
     expect(@chef_run.find_resources('template')).to have(2).items
     resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site1')
     expect(resource.variables).to eq({})
-    expect(resource).to notify('service[nginx]').to(:configtest).delayed
-    expect(resource).to notify('service[nginx]').to(:reload).delayed
+    expect(resource).to notify('service[nginx config reload]').to(:configtest).delayed
+    expect(resource).to notify('service[nginx config reload]').to(:reload).delayed
     resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site1')
     expect(resource.to).to eq('/etc/nginx/sites-available/site1')
     resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site2')
     expect(resource.variables).to eq({})
-    expect(resource).to notify('service[nginx]').to(:configtest).delayed
-    expect(resource).to notify('service[nginx]').to(:reload).delayed
+    expect(resource).to notify('service[nginx config reload]').to(:configtest).delayed
+    expect(resource).to notify('service[nginx config reload]').to(:reload).delayed
     resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site2')
     expect(resource.to).to eq('/etc/nginx/sites-available/site2')
   end
@@ -117,14 +135,14 @@ describe 'naemon::lwrp:service' do
     expect(@chef_run.find_resources('link')).to have(2).items
     resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site1')
     expect(resource.variables).to eq({})
-    expect(resource).to notify('service[nginx]').to(:configtest).delayed
-    expect(resource).to notify('service[nginx]').to(:reload).delayed
+    expect(resource).to notify('service[nginx config reload]').to(:configtest).delayed
+    expect(resource).to notify('service[nginx config reload]').to(:reload).delayed
     resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site1')
     expect(resource.to).to eq('/etc/nginx/sites-available/site1')
     resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site2')
     expect(resource.variables).to eq({})
-    expect(resource).to notify('service[nginx]').to(:configtest).delayed
-    expect(resource).to notify('service[nginx]').to(:reload).delayed
+    expect(resource).to notify('service[nginx config reload]').to(:configtest).delayed
+    expect(resource).to notify('service[nginx config reload]').to(:reload).delayed
     resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site2')
     expect(resource.to).to eq('/etc/nginx/sites-available/site2')
   end
@@ -146,14 +164,14 @@ describe 'naemon::lwrp:service' do
     expect(@chef_run.find_resources('link')).to have(4).items
     resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site1')
     expect(resource.variables).to eq({})
-    expect(resource).to notify('service[nginx]').to(:configtest).delayed
-    expect(resource).to notify('service[nginx]').to(:reload).delayed
+    expect(resource).to notify('service[nginx config reload]').to(:configtest).delayed
+    expect(resource).to notify('service[nginx config reload]').to(:reload).delayed
     resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site1')
     expect(resource.to).to eq('/etc/nginx/sites-available/site1')
     resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site2')
     expect(resource.variables).to eq({})
-    expect(resource).to notify('service[nginx]').to(:configtest).delayed
-    expect(resource).to notify('service[nginx]').to(:reload).delayed
+    expect(resource).to notify('service[nginx config reload]').to(:configtest).delayed
+    expect(resource).to notify('service[nginx config reload]').to(:reload).delayed
     resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site2')
     expect(resource.to).to eq('/etc/nginx/sites-available/site2')
     resource = @chef_run.find_resource('file', '/etc/nginx/sites-available/site3')

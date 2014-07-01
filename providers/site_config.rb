@@ -11,9 +11,11 @@ def get_site_config_files
 end
 
 action :create_or_update do
-  svc = service 'nginx' do
+  svc = service 'nginx config reload' do
+    service_name 'nginx'
     supports :reload => true, :configtest => true
     action :nothing
+    only_if 'service nginx status'
   end
   valid_sites = []
   nginx_base = ::File.join('/', 'etc', 'nginx')
