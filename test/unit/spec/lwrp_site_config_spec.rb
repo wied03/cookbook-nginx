@@ -80,12 +80,17 @@ describe 'naemon::lwrp:service' do
     # act + assert
     expect(@chef_run.find_resources('template')).to have(2).items
     resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site1')
-    expect(resource.variables).to be_nil
+    expect(resource.variables).to eq({})
     expect(resource).to notify('service[nginx]').to(:configtest).delayed
+    expect(resource).to notify('service[nginx]').to(:reload).delayed
+    resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site1')
+    expect(resource.to).to eq('/etc/nginx/sites-available/site1')
     resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site2')
-    expect(resource.variables).to be_nil
+    expect(resource.variables).to eq({})
     expect(resource).to notify('service[nginx]').to(:configtest).delayed
-    expect(@chef_run).to create_link('/etc/nginx/sites-enabled/site1').with(to: '/etc/nginx/sites-available/site1')
+    expect(resource).to notify('service[nginx]').to(:reload).delayed
+    resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site2')
+    expect(resource.to).to eq('/etc/nginx/sites-available/site2')
   end
 
   it 'replaces sites that exist already' do
