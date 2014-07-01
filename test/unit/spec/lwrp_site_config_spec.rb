@@ -3,6 +3,15 @@
 require_relative 'spec_helper'
 
 describe 'naemon::lwrp:service' do
+  def setup_mock_sites(sites)
+    [*sites].each do |site_name|
+      site_dir = File.join cookbook_path, 'templates', 'default', environment_name, 'sites'
+      FileUtils.mkdir_p site_dir
+      site_filename = File.join site_dir, "#{site_name}.erb"
+      FileUtils.touch site_filename
+    end
+  end
+
   include BswTech::ChefSpec::LwrpTestHelper
 
   before {
@@ -21,25 +30,15 @@ describe 'naemon::lwrp:service' do
     'site_config'
   end
 
-  def setup_recipe(contents)
+  def setup_recipe(sites,contents)
+    setup_mock_sites sites
     temp_lwrp_recipe contents
-  end
-
-  it 'sets up the template to be done at the end of the chef run' do
-    # assert
-    temp_lwrp_recipe <<-EOF
-        nginx_site_config 'site1'
-    EOF
-
-    # act + assert
-    resource = @chef_run.find_resource('nginx_site_config', 'site1')
-    expect(resource).to notify('nginx_site_config[apply]').to(:apply).delayed
   end
 
   it 'works properly with no variables and 1 site' do
     # arrange
-    setup_recipe <<-EOF
-        nginx_site_config 'site1'
+    setup_recipe 'site1', <<-EOF
+        nginx_site_config 'site config'
     EOF
 
     # act + assert
@@ -54,8 +53,8 @@ describe 'naemon::lwrp:service' do
 
   it 'works properly with variables and 1 site' do
     # arrange
-    setup_recipe <<-EOF
-            nginx_site_config 'site1' do
+    setup_recipe 'site1', <<-EOF
+            nginx_site_config 'site config' do
               variables({:stuff => 'foobar'})
             end
     EOF
@@ -72,9 +71,8 @@ describe 'naemon::lwrp:service' do
 
   it 'works properly with multiple sites' do
     # arrange
-    setup_recipe <<-EOF
-      nginx_site_config 'site1'
-      nginx_site_config 'site2'
+    setup_recipe ['site1','site2'], <<-EOF
+      nginx_site_config 'site config'
     EOF
 
     # act + assert

@@ -1,4 +1,4 @@
-actions :create_or_update, :apply
+actions :create_or_update
 default_action :create_or_update
 
 attribute :name, :kind_of => String, :name_attribute => true

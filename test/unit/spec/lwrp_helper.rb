@@ -15,15 +15,25 @@ module BswTech
         'lwrp_gen'
       end
 
-      def temp_lwrp_recipe(contents, runner_options={})
-        create_temp_cookbook(contents)
+      def environment_name
+        'thestagingenv'
+      end
+
+      def temp_lwrp_recipe(contents,runner_options={})
+        create_temp_cookbook contents
         RSpec.configure do |config|
           config.cookbook_path = [*config.cookbook_path] << generated_cookbook_path
         end
         lwrps_full = [*lwrps_under_test].map do |lwrp|
           "#{cookbook_under_test}_#{lwrp}"
         end
-        @chef_run = ::ChefSpec::Runner.new(runner_options.merge(step_into: lwrps_full))
+        @chef_run = ::ChefSpec::Runner.new(runner_options.merge(step_into: lwrps_full)) do |node|
+          env = Chef::Environment.new
+          env.name environment_name
+          allow(node).to receive(:chef_environment).and_return(env.name)
+          allow(node).to receive(:environment).and_return(env.name)
+          allow(Chef::Environment).to receive(:load).and_return(env)
+        end
         @chef_run.converge("#{generated_cookbook_name}::default")
       end
 
