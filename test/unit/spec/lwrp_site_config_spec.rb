@@ -23,7 +23,7 @@ describe 'naemon::lwrp:service' do
   }
 
   def cookbook_under_test
-    'nginx'
+    'bsw_nginx'
   end
 
   def lwrps_under_test
@@ -41,7 +41,7 @@ describe 'naemon::lwrp:service' do
     Dir.stub(:entries).with('/etc/nginx/sites-enabled').and_return []
     Dir.stub(:entries).with('/etc/nginx/sites-available').and_return []
     setup_recipe 'site1', <<-EOF
-        nginx_site_config 'site config'
+        bsw_nginx_site_config 'site config'
     EOF
 
     # act + assert
@@ -60,7 +60,7 @@ describe 'naemon::lwrp:service' do
     Dir.stub(:entries).with('/etc/nginx/sites-enabled').and_return []
     Dir.stub(:entries).with('/etc/nginx/sites-available').and_return []
     setup_recipe 'site1', <<-EOF
-      nginx_site_config 'site config' do
+      bsw_nginx_site_config 'site config' do
         variables({:stuff => 'foobar'})
       end
     EOF
@@ -81,7 +81,7 @@ describe 'naemon::lwrp:service' do
     Dir.stub(:entries).with('/etc/nginx/sites-enabled').and_return []
     Dir.stub(:entries).with('/etc/nginx/sites-available').and_return []
     setup_recipe ['site1', 'site2'], <<-EOF
-      nginx_site_config 'site config'
+      bsw_nginx_site_config 'site config'
     EOF
 
     # act + assert
@@ -106,7 +106,7 @@ describe 'naemon::lwrp:service' do
     Dir.stub(:entries).with('/etc/nginx/sites-enabled').and_return ['site1', 'site2']
     Dir.stub(:entries).with('/etc/nginx/sites-available').and_return ['site1', 'site2']
     setup_recipe ['site1', 'site2'], <<-EOF
-      nginx_site_config 'site config'
+      bsw_nginx_site_config 'site config'
     EOF
 
     # act + assert
@@ -135,7 +135,7 @@ describe 'naemon::lwrp:service' do
     Dir.stub(:entries).with('/etc/nginx/sites-enabled').and_return ['site3', 'site4']
     Dir.stub(:entries).with('/etc/nginx/sites-available').and_return ['site3', 'site4']
     setup_recipe ['site1', 'site2'], <<-EOF
-      nginx_site_config 'site config'
+      bsw_nginx_site_config 'site config'
     EOF
 
     # act + assert
