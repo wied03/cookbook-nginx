@@ -105,11 +105,26 @@ describe 'bsw_nginx::lwrp:complete_config' do
 
   it 'works properly with variables' do
     # arrange
+    force_validation_to :pass
+    setup_mock_config_files 'nginx.conf'
 
     # act
+    temp_lwrp_recipe <<-EOF
+      bsw_nginx_complete_config 'the config' do
+        variables({:stuff => 'foobar'})
+      end
+    EOF
 
     # assert
-    pending 'Write this test'
+    verify_var = lambda do |resource_type,name|
+      resource = @chef_run.find_resource resource_type,name
+      resource.variables.should == {:stuff => 'foobar'}
+    end
+
+    verify_var['template', '/tmp/temp_file_0/nginx.conf']
+    verify_var['template', '/etc/nginx/nginx.conf']
+    verify_var['bsw_nginx_site_config', 'real site config']
+    verify_var['bsw_nginx_site_config', 'test site config']
   end
 
   it 'complains without a main nginx config file in the templates directory' do

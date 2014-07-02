@@ -22,18 +22,23 @@ action :create_or_update do
     # These are template files but we want the real name
     without_erb = ::File.basename(config,'.erb')
     tmp_path = ::File.join(test_config_path, without_erb)
-    env_aware_template tmp_path
+    env_aware_template tmp_path do
+      variables new_resource.variables if new_resource.variables
+    end
     env_aware_template ::File.join('/etc/nginx',without_erb) do
       only_if validation_command
+      variables new_resource.variables if new_resource.variables
     end
   end
 
   bsw_nginx_site_config 'test site config' do
     base_path test_config_path
+    variables new_resource.variables if new_resource.variables
   end
 
   bsw_nginx_site_config 'real site config' do
     only_if validation_command
+    variables new_resource.variables if new_resource.variables
   end
 
   new_resource.updated_by_last_action(true)
