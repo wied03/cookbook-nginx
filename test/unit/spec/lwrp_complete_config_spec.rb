@@ -4,10 +4,14 @@ require_relative 'spec_helper'
 
 describe 'bsw_nginx::lwrp:complete_config' do
   def setup_mock_config_files(other_files)
+    # Chef returns files in subdirectories as well
+    files = ['sites/ignore.this']
+    files = files + [*other_files]
     template_dir = File.join cookbook_path, 'templates', 'default', environment_name
     FileUtils.mkdir_p template_dir
-    [*other_files].each do |other_file|
+    files.each do |other_file|
       site_filename = File.join template_dir, "#{other_file}.erb"
+      FileUtils.mkdir_p File.dirname(site_filename)
       FileUtils.touch site_filename
     end
   end
@@ -53,7 +57,7 @@ describe 'bsw_nginx::lwrp:complete_config' do
 
     # assert
     @chef_run.should render_file '/tmp/temp_file_0/nginx.conf'
-    @chef_run.should render_file '/etc/nginx.conf'
+    @chef_run.should render_file '/etc/nginx/nginx.conf'
     resource = @chef_run.find_resource 'bsw_nginx_site_config', 'real site config'
     resource.should_not be_nil
     resource.base_path.should == '/etc/nginx'
@@ -74,7 +78,7 @@ describe 'bsw_nginx::lwrp:complete_config' do
 
     # assert
     @chef_run.should render_file '/tmp/temp_file_0/nginx.conf'
-    @chef_run.should_not render_file '/etc/nginx.conf'
+    @chef_run.should_not render_file '/etc/nginx/nginx.conf'
     resource = @chef_run.find_resource 'bsw_nginx_site_config', 'real site config'
     resource.performed_actions.should be_empty
     resource = @chef_run.find_resource 'bsw_nginx_site_config', 'test site config'
@@ -94,9 +98,9 @@ describe 'bsw_nginx::lwrp:complete_config' do
 
     # assert
     @chef_run.should render_file '/tmp/temp_file_0/nginx.conf'
-    @chef_run.should render_file '/etc/nginx.conf'
+    @chef_run.should render_file '/etc/nginx/nginx.conf'
     @chef_run.should render_file '/tmp/temp_file_0/some.other.file'
-    @chef_run.should render_file '/etc/some.other.file'
+    @chef_run.should render_file '/etc/nginx/some.other.file'
   end
 
   it 'works properly with variables' do
