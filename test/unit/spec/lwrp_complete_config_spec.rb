@@ -56,6 +56,8 @@ describe 'bsw_nginx::lwrp:complete_config' do
     EOF
 
     # assert
+    @chef_run.should_not render_file '/etc/nginx/ignore.this'
+    @chef_run.should_not render_file '/tmp/temp_file_0/ignore.this'
     @chef_run.should render_file '/tmp/temp_file_0/nginx.conf'
     @chef_run.should render_file '/etc/nginx/nginx.conf'
     resource = @chef_run.find_resource 'bsw_nginx_site_config', 'real site config'
@@ -116,8 +118,8 @@ describe 'bsw_nginx::lwrp:complete_config' do
     EOF
 
     # assert
-    verify_var = lambda do |resource_type,name|
-      resource = @chef_run.find_resource resource_type,name
+    verify_var = lambda do |resource_type, name|
+      resource = @chef_run.find_resource resource_type, name
       resource.variables.should == {:stuff => 'foobar'}
     end
 
@@ -127,13 +129,40 @@ describe 'bsw_nginx::lwrp:complete_config' do
     verify_var['bsw_nginx_site_config', 'test site config']
   end
 
-  it 'complains without a main nginx config file in the templates directory' do
+  it 'complains when there are no files in the templates directory' do
     # arrange
+    force_validation_to :pass
+    setup_mock_config_files []
 
     # act
+    action = lambda {
+      temp_lwrp_recipe <<-EOF
+      bsw_nginx_complete_config 'the config' do
+        variables({:stuff => 'foobar'})
+      end
+      EOF
+    }
 
     # assert
-    pending 'Write this test'
+    action.should raise_exception RuntimeError, 'bsw_nginx_complete_config[the config] (lwrp_gen::default line 1) had an error: RuntimeError: You must have a top level nginx.conf file in your templates/default/env directory.  You only have []'
+  end
+
+  it 'complains when there are files in the templates directory but not the main one' do
+    # arrange
+    force_validation_to :pass
+    setup_mock_config_files ['junk.config']
+
+    # act
+    action = lambda {
+      temp_lwrp_recipe <<-EOF
+        bsw_nginx_complete_config 'the config' do
+          variables({:stuff => 'foobar'})
+        end
+      EOF
+    }
+
+    # assert
+    action.should raise_exception RuntimeError, 'bsw_nginx_complete_config[the config] (lwrp_gen::default line 1) had an error: RuntimeError: You must have a top level nginx.conf file in your templates/default/env directory.  You only have ["junk.config"]'
   end
 
   it 'returns updated by last action if the enclosed resources do' do
