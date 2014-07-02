@@ -41,9 +41,7 @@ action :create_or_update do
   end
   dir_returns_these_but_we_dont_care_about_them = ['.', '..']
   # Can't have any invalid ones if directory isn't there to start with
-  # TODO: Unit test this
-  #invalid_sites = ::Dir.exists?(avail_dir) ? ::Dir.entries(avail_dir) - dir_returns_these_but_we_dont_care_about_them - valid_sites : []
-  invalid_sites = ::Dir.entries(avail_dir) - dir_returns_these_but_we_dont_care_about_them - valid_sites
+  invalid_sites = ::Dir.exists?(avail_dir) ? ::Dir.entries(avail_dir) - dir_returns_these_but_we_dont_care_about_them - valid_sites : []
   invalid_sites.each do |site|
     resource = link ::File.join(link_dir, site) do
       action :delete

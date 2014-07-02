@@ -40,7 +40,9 @@ describe 'bsw_nginx::lwrp:site_config' do
     complete = ['.', '..'] + sites
     Dir.stub(:entries).and_call_original
     Dir.stub(:entries).with(File.join(base_path, 'sites-enabled')).and_return complete
-    Dir.stub(:entries).with(File.join(base_path, 'sites-available')).and_return complete
+    avail = File.join(base_path, 'sites-available')
+    Dir.stub(:entries).with(avail).and_return complete
+    Dir.stub(:exists?).with(avail).and_return true
   end
 
   it 'creates a directory for sites-available and sites-enabled' do
@@ -291,5 +293,28 @@ describe 'bsw_nginx::lwrp:site_config' do
     expect(resource.to).to eq('/etc/other_dir/sites-available/site1')
     @chef_run.should create_directory '/etc/other_dir/sites-enabled'
     @chef_run.should create_directory '/etc/other_dir/sites-available'
+  end
+
+  it 'works properly when the sites directories do not exist' do
+    # arrange
+    Dir.stub(:entries).and_call_original
+    base_path = '/etc/nginx'
+    Dir.stub(:entries).with(File.join(base_path, 'sites-enabled')).and_raise 'directory does not exist'
+    avail = File.join(base_path, 'sites-available')
+    Dir.stub(:entries).with(avail).and_raise 'directory does not exist'
+    Dir.stub(:exists?).with(avail).and_return false
+
+    # act
+    setup_recipe 'site1', <<-EOF
+      bsw_nginx_site_config 'site config'
+    EOF
+
+    # assert
+    expect(@chef_run.find_resources('template')).to have(1).items
+    resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site1')
+    expect(resource.variables).to eq({})
+    expect(resource.source).to eq 'thestagingenv/sites/site1.erb'
+    resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site1')
+    expect(resource.to).to eq('/etc/nginx/sites-available/site1')
   end
 end
