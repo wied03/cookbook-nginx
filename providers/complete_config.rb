@@ -31,7 +31,7 @@ action :create_or_update do
   end
   test_main_config = ::File.join(test_config_path, 'nginx.conf')
   validation_command = "/usr/sbin/nginx -c #{test_main_config} -t"
-  main_config_resources = []
+  updateable_resources = []
   top_level.each do |config|
     tmp_path = ::File.join(test_config_path, config)
     env_aware_template tmp_path do
@@ -41,7 +41,7 @@ action :create_or_update do
       only_if validation_command
       variables new_resource.variables if new_resource.variables
     end
-    main_config_resources << resource
+    updateable_resources << resource
   end
 
   bsw_nginx_site_config 'test site config' do
@@ -49,10 +49,14 @@ action :create_or_update do
     variables new_resource.variables if new_resource.variables
   end
 
-  bsw_nginx_site_config 'real site config' do
+  resource = bsw_nginx_site_config 'real site config' do
     only_if validation_command
     variables new_resource.variables if new_resource.variables
   end
 
-  new_resource.updated_by_last_action(main_config_resources.any? {|r| r.updated_by_last_action?})
+  updateable_resources << resource
+
+  # Easier to test
+  checker = BswTech::ComplexUpdateChecker.new
+  new_resource.updated_by_last_action(updateable_resources.any? {|r| checker.updated_by_last_action?(r)})
 end

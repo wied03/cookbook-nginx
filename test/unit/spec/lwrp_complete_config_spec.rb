@@ -1,6 +1,7 @@
 # Encoding: utf-8
 
 require_relative 'spec_helper'
+require_relative '../../../libraries/complex_update_checker'
 
 describe 'bsw_nginx::lwrp:complete_config' do
   def setup_mock_config_files(other_files)
@@ -45,14 +46,11 @@ describe 'bsw_nginx::lwrp:complete_config' do
     stub_command('/usr/sbin/nginx -c /tmp/temp_file_0/nginx.conf -t').and_return(option == :pass)
   end
 
-  def stub_updated_by(the_class)
-    orig = the_class.method(:new)
-    the_class.stub(:new) do |*args, &block|
-      orig.call(*args, &block).tap do |instance|
-        instance.stub(:updated_by_last_action?) {
-          yield instance
-        }
-      end
+  def stub_updated_by
+    checker = double()
+    BswTech::ComplexUpdateChecker.stub(:new).and_return(checker)
+    checker.stub(:updated_by_last_action?) do |instance|
+      yield instance
     end
   end
 
@@ -180,7 +178,7 @@ describe 'bsw_nginx::lwrp:complete_config' do
     # arrange
     force_validation_to :pass
     setup_mock_config_files 'nginx.conf'
-    stub_updated_by(Chef::Resource::Template) do |instance|
+    stub_updated_by do |instance|
       case instance.name
         when '/tmp/temp_file_0/nginx.conf'
           true
@@ -203,7 +201,7 @@ describe 'bsw_nginx::lwrp:complete_config' do
     # arrange
     force_validation_to :pass
     setup_mock_config_files 'nginx.conf'
-    stub_updated_by(Chef::Resource::Template) do |instance|
+    stub_updated_by do |instance|
       case instance.name
         when '/tmp/temp_file_0/nginx.conf'
           true
@@ -224,20 +222,34 @@ describe 'bsw_nginx::lwrp:complete_config' do
 
   it 'returns updated by last action if the site config resource was updated' do
     # arrange
+    force_validation_to :pass
+    setup_mock_config_files 'nginx.conf'
+    stub_updated_by { true }
 
     # act
+    temp_lwrp_recipe <<-EOF
+      bsw_nginx_complete_config 'the config'
+    EOF
 
     # assert
-    pending 'Write this test'
+    resource = @chef_run.find_resource 'bsw_nginx_complete_config', 'the config'
+    resource.updated_by_last_action?.should == true
   end
 
   it 'does not return updated by last action if the site config resource was not updated' do
     # arrange
+    force_validation_to :pass
+    setup_mock_config_files 'nginx.conf'
+    stub_updated_by { false }
 
     # act
+    temp_lwrp_recipe <<-EOF
+      bsw_nginx_complete_config 'the config'
+    EOF
 
     # assert
-    pending 'Write this test'
+    resource = @chef_run.find_resource 'bsw_nginx_complete_config', 'the config'
+    resource.updated_by_last_action?.should == false
   end
 
   it 'cleans up temporary config files if validation passes' do
