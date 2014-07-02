@@ -26,21 +26,22 @@ action :create_or_update do
   test_config_path = Dir.mktmpdir
   # These are template files but we want the real name
   top_level = top_level_config_files.map {|f| ::File.basename(f,'.erb')}
-  puts "resources are #{top_level}"
   unless top_level.include? 'nginx.conf'
     fail "You must have a top level nginx.conf file in your templates/default/env directory.  You only have #{top_level}"
   end
   test_main_config = ::File.join(test_config_path, 'nginx.conf')
   validation_command = "/usr/sbin/nginx -c #{test_main_config} -t"
+  main_config_resources = []
   top_level.each do |config|
     tmp_path = ::File.join(test_config_path, config)
     env_aware_template tmp_path do
       variables new_resource.variables if new_resource.variables
     end
-    env_aware_template ::File.join('/etc/nginx',config) do
+    resource = env_aware_template ::File.join('/etc/nginx',config) do
       only_if validation_command
       variables new_resource.variables if new_resource.variables
     end
+    main_config_resources << resource
   end
 
   bsw_nginx_site_config 'test site config' do
@@ -53,5 +54,5 @@ action :create_or_update do
     variables new_resource.variables if new_resource.variables
   end
 
-  new_resource.updated_by_last_action(true)
+  new_resource.updated_by_last_action(main_config_resources.any? {|r| r.updated_by_last_action?})
 end

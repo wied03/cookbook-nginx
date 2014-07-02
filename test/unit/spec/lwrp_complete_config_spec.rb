@@ -45,6 +45,17 @@ describe 'bsw_nginx::lwrp:complete_config' do
     stub_command('/usr/sbin/nginx -c /tmp/temp_file_0/nginx.conf -t').and_return(option == :pass)
   end
 
+  def stub_updated_by(the_class)
+    orig = the_class.method(:new)
+    the_class.stub(:new) do |*args, &block|
+      orig.call(*args, &block).tap do |instance|
+        instance.stub(:updated_by_last_action?) {
+          yield instance
+        }
+      end
+    end
+  end
+
   it 'creates all resources with a valid config' do
     # arrange
     force_validation_to :pass
@@ -165,7 +176,53 @@ describe 'bsw_nginx::lwrp:complete_config' do
     action.should raise_exception RuntimeError, 'bsw_nginx_complete_config[the config] (lwrp_gen::default line 1) had an error: RuntimeError: You must have a top level nginx.conf file in your templates/default/env directory.  You only have ["junk.config"]'
   end
 
-  it 'returns updated by last action if the enclosed resources do' do
+  it 'returns updated by last action if the main config resource was updated' do
+    # arrange
+    force_validation_to :pass
+    setup_mock_config_files 'nginx.conf'
+    stub_updated_by(Chef::Resource::Template) do |instance|
+      case instance.name
+        when '/tmp/temp_file_0/nginx.conf'
+          true
+        when '/etc/nginx/nginx.conf'
+          true
+      end
+    end
+
+    # act
+    temp_lwrp_recipe <<-EOF
+      bsw_nginx_complete_config 'the config'
+    EOF
+
+    # assert
+    resource = @chef_run.find_resource 'bsw_nginx_complete_config', 'the config'
+    resource.updated_by_last_action?.should == true
+  end
+
+  it 'does not return updated by last action if the main config resource was not updated' do
+    # arrange
+    force_validation_to :pass
+    setup_mock_config_files 'nginx.conf'
+    stub_updated_by(Chef::Resource::Template) do |instance|
+      case instance.name
+        when '/tmp/temp_file_0/nginx.conf'
+          true
+        when '/etc/nginx/nginx.conf'
+          false
+      end
+    end
+
+    # act
+    temp_lwrp_recipe <<-EOF
+      bsw_nginx_complete_config 'the config'
+    EOF
+
+    # assert
+    resource = @chef_run.find_resource 'bsw_nginx_complete_config', 'the config'
+    resource.updated_by_last_action?.should == false
+  end
+
+  it 'returns updated by last action if the site config resource was updated' do
     # arrange
 
     # act
@@ -174,7 +231,7 @@ describe 'bsw_nginx::lwrp:complete_config' do
     pending 'Write this test'
   end
 
-  it 'does not return updated by last action of the enclosed resources are not updated' do
+  it 'does not return updated by last action if the site config resource was not updated' do
     # arrange
 
     # act
