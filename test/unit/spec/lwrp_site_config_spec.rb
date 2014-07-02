@@ -2,7 +2,7 @@
 
 require_relative 'spec_helper'
 
-describe 'naemon::lwrp:service' do
+describe 'bsw_nginx::lwrp:site_config' do
   def setup_mock_sites(sites)
     [*sites].each do |site_name|
       site_dir = File.join cookbook_path, 'templates', 'default', environment_name, 'sites'
@@ -37,46 +37,17 @@ describe 'naemon::lwrp:service' do
 
   def stub_existing_sites(sites)
     # dir will always include this
-    complete = ['.','..'] + sites
+    complete = ['.', '..'] + sites
     Dir.stub(:entries).and_call_original
     Dir.stub(:entries).with('/etc/nginx/sites-enabled').and_return complete
     Dir.stub(:entries).with('/etc/nginx/sites-available').and_return complete
   end
 
-  it 'defines a service resource correctly' do
-    # arrange
-    stub_existing_sites []
-    setup_recipe 'site1', <<-EOF
-      bsw_nginx_site_config 'site config'
-    EOF
-
-    # act + assert
-    resource = @chef_run.find_resource 'service', 'nginx config reload'
-    expect(resource).to_not be_nil
-    expect(resource.service_name).to eq 'nginx'
-    expect(resource.action).to eq [:nothing]
-    expect(resource.supports).to eq :reload => true, :configtest => true
-    expect(resource.only_if.map { |c| c.command }).to eq ['service nginx status']
-  end
-
-  it 'defines a config test resource correctly' do
-     # arrange
-     stub_existing_sites []
-     setup_recipe 'site1', <<-EOF
-       bsw_nginx_site_config 'site config'
-     EOF
-
-     # act + assert
-     resource = @chef_run.find_resource 'bash', 'nginx config test'
-     expect(resource).to_not be_nil
-     expect(resource.code).to eq 'service nginx configtest'
-     expect(resource.action).to eq [:nothing]
-   end
-
   it 'works properly with no variables and 1 site' do
     # arrange
     stub_existing_sites []
     setup_recipe 'site1', <<-EOF
+        include_recipe 'bsw_nginx::default'
         bsw_nginx_site_config 'site config'
     EOF
 
@@ -95,6 +66,7 @@ describe 'naemon::lwrp:service' do
     # arrange
     stub_existing_sites []
     setup_recipe 'site1', <<-EOF
+      include_recipe 'bsw_nginx::default'
       bsw_nginx_site_config 'site config' do
         variables({:stuff => 'foobar'})
       end
@@ -115,6 +87,7 @@ describe 'naemon::lwrp:service' do
     # arrange
     stub_existing_sites []
     setup_recipe ['site1', 'site2'], <<-EOF
+      include_recipe 'bsw_nginx::default'
       bsw_nginx_site_config 'site config'
     EOF
 
@@ -139,6 +112,7 @@ describe 'naemon::lwrp:service' do
     # arrange
     stub_existing_sites ['site1', 'site2']
     setup_recipe ['site1', 'site2'], <<-EOF
+      include_recipe 'bsw_nginx::default'
       bsw_nginx_site_config 'site config'
     EOF
 
@@ -167,6 +141,7 @@ describe 'naemon::lwrp:service' do
     # arrange
     stub_existing_sites ['site3', 'site4']
     setup_recipe ['site1', 'site2'], <<-EOF
+      include_recipe 'bsw_nginx::default'
       bsw_nginx_site_config 'site config'
     EOF
 
