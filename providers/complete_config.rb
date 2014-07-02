@@ -51,24 +51,27 @@ def create_temporary_files(template_top_level_files, test_config_path)
   resource.run_action :create_or_update
 end
 
-action :create_or_update do
+def validate_configuration(top_level_template_files)
   test_config_path = Dir.mktmpdir
-  # TODO: Put validation in its own method
   begin
     # These are template files but we want the real name
-    top_level = top_level_config_files.map { |f| ::File.basename(f, '.erb') }
-    unless top_level.include? 'nginx.conf'
-      fail "You must have a top level nginx.conf file in your templates/default/env directory.  You only have #{top_level}"
+    unless top_level_template_files.include? 'nginx.conf'
+      fail "You must have a top level nginx.conf file in your templates/default/env directory.  You only have #{top_level_template_files}"
     end
     test_main_config = ::File.join(test_config_path, 'nginx.conf')
-    create_temporary_files top_level, test_config_path
+    create_temporary_files top_level_template_files, test_config_path
     run_command "/usr/sbin/nginx -c #{test_main_config} -t"
   ensure
     ::FileUtils.rm_rf test_config_path
   end
+end
+
+action :create_or_update do
+  top_level_template_files = top_level_config_files.map { |f| ::File.basename(f, '.erb') }
+  validate_configuration(top_level_template_files)
 
   resources_that_trigger_update = []
-  top_level.each do |config|
+  top_level_template_files.each do |config|
     resource = env_aware_template ::File.join('/etc/nginx', config) do
       variables new_resource.variables if new_resource.variables
     end
