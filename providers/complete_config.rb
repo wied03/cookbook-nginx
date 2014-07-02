@@ -51,15 +51,14 @@ end
 
 action :create_or_update do
   test_config_path = Dir.mktmpdir
-  # These are template files but we want the real name
-  top_level = top_level_config_files.map { |f| ::File.basename(f, '.erb') }
-  unless top_level.include? 'nginx.conf'
-    fail "You must have a top level nginx.conf file in your templates/default/env directory.  You only have #{top_level}"
-  end
-  test_main_config = ::File.join(test_config_path, 'nginx.conf')
-  create_temporary_files top_level, test_config_path
-
   begin
+    # These are template files but we want the real name
+    top_level = top_level_config_files.map { |f| ::File.basename(f, '.erb') }
+    unless top_level.include? 'nginx.conf'
+      fail "You must have a top level nginx.conf file in your templates/default/env directory.  You only have #{top_level}"
+    end
+    test_main_config = ::File.join(test_config_path, 'nginx.conf')
+    create_temporary_files top_level, test_config_path
     run_command "/usr/sbin/nginx -c #{test_main_config} -t"
   ensure
     ::FileUtils.rm_rf test_config_path
