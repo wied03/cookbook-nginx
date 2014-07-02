@@ -2,13 +2,19 @@
 
 require_relative 'spec_helper'
 
-describe 'bsw_nginx::lwrp:site_config' do
-  def setup_mock_sites(sites)
-    site_dir = File.join cookbook_path, 'templates', 'default', environment_name, 'sites'
-    FileUtils.mkdir_p site_dir
+describe 'bsw_nginx::lwrp:complete_config' do
+  def setup_mock_sites(sites, create_main_config=true)
+    template_dir = File.join cookbook_path, 'templates', 'default', environment_name
+    FileUtils.mkdir_p template_dir
     [*sites].each do |site_name|
+      site_dir = File.join template_dir, 'sites'
+      FileUtils.mkdir_p site_dir
       site_filename = File.join site_dir, "#{site_name}.erb"
       FileUtils.touch site_filename
+    end
+    if create_main_config
+      config_path = File.join template_dir, 'nginx.conf.erb'
+      FileUtils.touch config_path
     end
   end
 
@@ -16,6 +22,35 @@ describe 'bsw_nginx::lwrp:site_config' do
 
   before {
     stub_resources
+    @stub_setup = nil
+    original_new = Mixlib::ShellOut.method(:new)
+    Mixlib::ShellOut.stub!(:new) do |*args|
+      cmd = original_new.call(*args)
+      cmd.stub!(:run_command)
+      @stub_setup.call(cmd) if @stub_setup
+      cmd
+    end
+    @open_tempfiles = []
+    @written_to_files = {}
+    Dir::Tmpname.stub!(:create) do
+      name = "temp_file_#{@open_tempfiles.length}"
+      @open_tempfiles << name
+      name
+    end
+    Tempfile.stub!(:new) do |prefix|
+      temp_file_stub = double()
+      name = "temp_file_#{@open_tempfiles.length}"
+      @open_tempfiles << name
+      temp_file_stub.stub!(:path).and_return "/path/to/#{name}"
+      temp_file_stub.stub!(:close)
+      temp_file_stub.stub!(:unlink)
+      temp_file_stub.stub!(:'<<') do |text|
+        @written_to_files[name] = text
+      end
+      temp_file_stub
+    end
+    ::File.stub!(:exist?).and_call_original
+    ::File.stub!(:exist?).with('temp_file_0').and_return(true)
   }
 
   after(:each) {
@@ -27,7 +62,7 @@ describe 'bsw_nginx::lwrp:site_config' do
   end
 
   def lwrps_under_test
-    'site_config'
+    'complete_config'
   end
 
   def setup_recipe(sites, contents)
@@ -35,178 +70,101 @@ describe 'bsw_nginx::lwrp:site_config' do
     temp_lwrp_recipe contents
   end
 
-  def stub_existing_sites(sites,base_path='/etc/nginx')
+  def stub_existing_sites(sites)
     # dir will always include this
     complete = ['.', '..'] + sites
     Dir.stub(:entries).and_call_original
-    Dir.stub(:entries).with(File.join(base_path,'sites-enabled')).and_return complete
-    Dir.stub(:entries).with(File.join(base_path,'sites-available')).and_return complete
+    Dir.stub(:entries).with('/etc/nginx/sites-enabled').and_return complete
+    Dir.stub(:entries).with('/etc/nginx/sites-available').and_return complete
   end
 
-  it 'sets updated if a template is updated' do
+  it 'works properly with no variables and 1 site and a valid config' do
     # arrange
+    executed = []
+    @stub_setup = lambda do |shell_out|
+      case shell_out.command
+        when '/usr/sbin/nginx -c /tmp/temp_file_0/nginx.conf -t'
+          shell_out.stub(:error!)
+        else
+          shell_out.stub(:error!).and_raise "Unexpected command #{shell_out.command}"
+      end
+    end
     stub_existing_sites []
-    Chef::Resource::Template.any_instance.stub(:updated_by_last_action?).and_return true
-
-    # act
     setup_recipe 'site1', <<-EOF
-      bsw_nginx_site_config 'site config'
-    EOF
-
-    # assert
-    resource = @chef_run.find_resource 'bsw_nginx_site_config', 'site config'
-    expect(resource.updated_by_last_action?).to be true
-  end
-
-  it 'sets updated if a link is updated' do
-    # arrange
-    stub_existing_sites []
-    Chef::Resource::Link.any_instance.stub(:updated_by_last_action?).and_return true
-
-    # act
-    setup_recipe 'site1', <<-EOF
+        include_recipe 'bsw_nginx::default'
         bsw_nginx_site_config 'site config'
     EOF
 
-    # assert
-    resource = @chef_run.find_resource 'bsw_nginx_site_config', 'site config'
-    expect(resource.updated_by_last_action?).to be true
-  end
-
-  it 'sets updated if a link is deleted' do
-    # arrange
-    stub_existing_sites ['site3', 'site4']
-    Chef::Resource::Link.any_instance.stub(:updated_by_last_action?).and_return true
-
-    # act
-    setup_recipe [], <<-EOF
-      bsw_nginx_site_config 'site config'
-    EOF
-
-    # assert
-    resource = @chef_run.find_resource 'bsw_nginx_site_config', 'site config'
-    expect(resource.updated_by_last_action?).to be true
-  end
-
-  it 'sets updated if a file is deleted' do
-    # arrange
-    stub_existing_sites ['site3', 'site4']
-    Chef::Resource::File.any_instance.stub(:updated_by_last_action?).and_return true
-
-    # act
-    setup_recipe [], <<-EOF
-      bsw_nginx_site_config 'site config'
-    EOF
-
-    # assert
-    resource = @chef_run.find_resource 'bsw_nginx_site_config', 'site config'
-    expect(resource.updated_by_last_action?).to be true
-  end
-
-  it 'works properly if no sites exist' do
-    # arrange
-    stub_existing_sites []
-
-    # act
-    setup_recipe [], <<-EOF
-          bsw_nginx_site_config 'site config'
-    EOF
-
-    # assert
-    expect(@chef_run.find_resources('template')).to be_empty
-  end
-
-  it 'works properly if all sites are removed' do
-    # arrange
-    stub_existing_sites ['site3', 'site4']
-
-    # act
-    setup_recipe [], <<-EOF
-      bsw_nginx_site_config 'site config'
-    EOF
-
-    # assert
-    expect(@chef_run.find_resources('template')).to be_empty
-    resource = @chef_run.find_resource('file', '/etc/nginx/sites-available/site3')
-    expect(resource.action).to eq [:delete]
-    resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site3')
-    expect(resource.action).to eq [:delete]
-    resource = @chef_run.find_resource('file', '/etc/nginx/sites-available/site4')
-    expect(resource.action).to eq [:delete]
-    resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site4')
-    expect(resource.action).to eq [:delete]
-  end
-
-  it 'works properly with no variables and 1 site' do
-    # arrange
-    stub_existing_sites []
-
-    # act
-    setup_recipe 'site1', <<-EOF
-        bsw_nginx_site_config 'site config'
-    EOF
-
-    # assert
-    expect(@chef_run.find_resources('template')).to have(1).items
-    resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site1')
-    expect(resource.variables).to eq({})
-    expect(resource.source).to eq 'thestagingenv/sites/site1.erb'
+    # act + assert
+    # 1 real, 1 testing
+    expect(@chef_run.find_resources('template')).to have(2).items
+    resources_to_check = [@chef_run.find_resource('template', '/tmp/temp_file_0//sites-available/site1'),
+                          @chef_run.find_resource('template', '/etc/nginx/sites-available/site1')]
+    resources_to_check.each do |resource|
+      expect(resource.variables).to eq({})
+      expect(resource.source).to eq 'thestagingenv/sites/site1.erb'
+    end
     resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site1')
     expect(resource.to).to eq('/etc/nginx/sites-available/site1')
+    resource = @chef_run.find_resource 'bsw_nginx_site_config', 'site config'
+    expect(resource.updated_by_last_action?).to be_true
   end
 
-  it 'works properly with variables and 1 site' do
+  it 'works properly with variables and 1 site and a valid config' do
     # arrange
     stub_existing_sites []
-
-    # act
     setup_recipe 'site1', <<-EOF
+      include_recipe 'bsw_nginx::default'
       bsw_nginx_site_config 'site config' do
         variables({:stuff => 'foobar'})
       end
     EOF
 
-    # assert
+    # act + assert
     expect(@chef_run.find_resources('template')).to have(1).items
     resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site1')
     expect(resource.variables).to eq(:stuff => 'foobar')
     expect(resource.source).to eq 'thestagingenv/sites/site1.erb'
+    expect(resource).to notify('bash[nginx config test]').to(:run).delayed
+    expect(resource).to notify('service[nginx config reload]').to(:reload).delayed
     resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site1')
     expect(resource.to).to eq('/etc/nginx/sites-available/site1')
   end
 
-  it 'works properly with multiple sites' do
+  it 'works properly with multiple sites and a valid config' do
     # arrange
     stub_existing_sites []
-
-    # act
     setup_recipe ['site1', 'site2'], <<-EOF
+      include_recipe 'bsw_nginx::default'
       bsw_nginx_site_config 'site config'
     EOF
 
-    # assert
+    # act + assert
     expect(@chef_run.find_resources('template')).to have(2).items
     resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site1')
     expect(resource.variables).to eq({})
     expect(resource.source).to eq 'thestagingenv/sites/site1.erb'
+    expect(resource).to notify('bash[nginx config test]').to(:run).delayed
+    expect(resource).to notify('service[nginx config reload]').to(:reload).delayed
     resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site1')
     expect(resource.to).to eq('/etc/nginx/sites-available/site1')
     resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site2')
     expect(resource.variables).to eq({})
+    expect(resource).to notify('bash[nginx config test]').to(:run).delayed
+    expect(resource).to notify('service[nginx config reload]').to(:reload).delayed
     resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site2')
     expect(resource.to).to eq('/etc/nginx/sites-available/site2')
   end
 
-  it 'replaces sites that exist already' do
+  it 'replaces sites that exist already and a valid config' do
     # arrange
     stub_existing_sites ['site1', 'site2']
-
-    # act
     setup_recipe ['site1', 'site2'], <<-EOF
+      include_recipe 'bsw_nginx::default'
       bsw_nginx_site_config 'site config'
     EOF
 
-    # assert
+    # act + assert
     expect(@chef_run.find_resources('template')).to have(2).items
     # Only the template will be used, we're only using file to delete sites we don't need anymore
     expect(@chef_run.find_resources('file')).to have(0).items
@@ -215,24 +173,27 @@ describe 'bsw_nginx::lwrp:site_config' do
     resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site1')
     expect(resource.variables).to eq({})
     expect(resource.source).to eq 'thestagingenv/sites/site1.erb'
+    expect(resource).to notify('bash[nginx config test]').to(:run).delayed
+    expect(resource).to notify('service[nginx config reload]').to(:reload).delayed
     resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site1')
     expect(resource.to).to eq('/etc/nginx/sites-available/site1')
     resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site2')
     expect(resource.variables).to eq({})
+    expect(resource).to notify('bash[nginx config test]').to(:run).delayed
+    expect(resource).to notify('service[nginx config reload]').to(:reload).delayed
     resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site2')
     expect(resource.to).to eq('/etc/nginx/sites-available/site2')
   end
 
-  it 'removes sites that are no longer configured' do
+  it 'removes sites that are no longer configured and a valid config' do
     # arrange
     stub_existing_sites ['site3', 'site4']
-
-    # act
     setup_recipe ['site1', 'site2'], <<-EOF
+      include_recipe 'bsw_nginx::default'
       bsw_nginx_site_config 'site config'
     EOF
 
-    # assert
+    # act + assert
     expect(@chef_run.find_resources('template')).to have(2).items
     # Should have 1 file delete per each removed site
     expect(@chef_run.find_resources('file')).to have(2).items
@@ -241,10 +202,14 @@ describe 'bsw_nginx::lwrp:site_config' do
     resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site1')
     expect(resource.variables).to eq({})
     expect(resource.source).to eq 'thestagingenv/sites/site1.erb'
+    expect(resource).to notify('bash[nginx config test]').to(:run).delayed
+    expect(resource).to notify('service[nginx config reload]').to(:reload).delayed
     resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site1')
     expect(resource.to).to eq('/etc/nginx/sites-available/site1')
     resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site2')
     expect(resource.variables).to eq({})
+    expect(resource).to notify('bash[nginx config test]').to(:run).delayed
+    expect(resource).to notify('service[nginx config reload]').to(:reload).delayed
     resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site2')
     expect(resource.to).to eq('/etc/nginx/sites-available/site2')
     resource = @chef_run.find_resource('file', '/etc/nginx/sites-available/site3')
@@ -257,23 +222,36 @@ describe 'bsw_nginx::lwrp:site_config' do
     expect(resource.action).to eq [:delete]
   end
 
-  it 'works with a different base path' do
+  it 'complains without a main nginx config file in the templates directory' do
     # arrange
-    stub_existing_sites [], '/etc/other_dir'
 
     # act
-    setup_recipe 'site1', <<-EOF
-      bsw_nginx_site_config 'site config' do
-        base_path '/etc/other_dir'
-      end
-    EOF
 
     # assert
+    pending 'Write this test'
+  end
+
+  it 'does not change anything if the config is not valid' do
+    # arrange
+    stub_existing_sites []
+    setup_recipe 'site1', <<-EOF
+            include_recipe 'bsw_nginx::default'
+            bsw_nginx_site_config 'site config'
+    EOF
+
+    # act + assert
     expect(@chef_run.find_resources('template')).to have(1).items
-    resource = @chef_run.find_resource('template', '/etc/other_dir/sites-available/site1')
+    resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site1')
     expect(resource.variables).to eq({})
     expect(resource.source).to eq 'thestagingenv/sites/site1.erb'
-    resource = @chef_run.find_resource('link', '/etc/other_dir/sites-enabled/site1')
-    expect(resource.to).to eq('/etc/other_dir/sites-available/site1')
+    expect(resource).to notify('bash[nginx config test]').to(:run).delayed
+    expect(resource).to notify('service[nginx config reload]').to(:reload).delayed
+    resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site1')
+    expect(resource.to).to eq('/etc/nginx/sites-available/site1')
+
+    # act
+
+    # assert
+    pending 'Write this test'
   end
 end

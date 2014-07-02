@@ -33,8 +33,8 @@ describe 'bsw_nginx::lwrp:other_config' do
     resource = @chef_run.find_resource('template', '/etc/nginx.conf')
     expect(resource.variables).to eq({})
     expect(resource.source).to eq 'thestagingenv/nginx.conf.erb'
-    expect(resource).to notify('bash[nginx config test]').to(:run).delayed
-    expect(resource).to notify('service[nginx config reload]').to(:reload).delayed
+    resource = @chef_run.find_resource 'bsw_nginx_other_config', '/etc/nginx.conf'
+    expect(resource.updated_by_last_action?).to be_true
   end
 
   it 'works properly with variables' do
@@ -51,7 +51,34 @@ describe 'bsw_nginx::lwrp:other_config' do
     resource = @chef_run.find_resource('template', '/etc/nginx.conf2')
     expect(resource.variables).to eq(:stuff => 'foobar')
     expect(resource.source).to eq 'thestagingenv/nginx.conf2.erb'
-    expect(resource).to notify('bash[nginx config test]').to(:run).delayed
-    expect(resource).to notify('service[nginx config reload]').to(:reload).delayed
+    resource = @chef_run.find_resource 'bsw_nginx_other_config', '/etc/nginx.conf2'
+    expect(resource.updated_by_last_action?).to be_true
+  end
+
+  it 'sets the updated flag if the template is updated' do
+    # arrange
+
+    # act
+
+    # assert
+    pending 'Write this test'
+  end
+
+  it 'does not set the updated flag if the template is not updated' do
+    # arrange
+
+    # act
+
+    # assert
+    pending 'Write this test'
+  end
+
+  it 'works with a different base path' do
+    # arrange
+
+    # act
+
+    # assert
+    pending 'Write this test'
   end
 end
