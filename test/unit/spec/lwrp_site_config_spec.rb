@@ -317,4 +317,34 @@ describe 'bsw_nginx::lwrp:site_config' do
     resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site1')
     expect(resource.to).to eq('/etc/nginx/sites-available/site1')
   end
+
+  it 'suppresses output if told to do so' do
+    # arrange
+    stub_existing_sites []
+
+    # act
+    setup_recipe 'site1', <<-EOF
+      bsw_nginx_site_config 'site config' do
+        suppress_output true
+      end
+    EOF
+
+    # assert
+    resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site1')
+    resource.sensitive.should == true
+  end
+
+  it 'does not suppress output by default' do
+    # arrange
+    stub_existing_sites []
+
+    # act
+    setup_recipe 'site1', <<-EOF
+      bsw_nginx_site_config 'site config'
+    EOF
+
+    # assert
+    resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site1')
+    resource.sensitive.should == false
+  end
 end

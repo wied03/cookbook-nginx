@@ -36,6 +36,7 @@ def create_temporary_files(template_top_level_files, test_config_path)
       variables new_resource.variables if new_resource.variables
       # Only create the temp files right now, don't run this later
       action :nothing
+      sensitive true
     end
     resource.run_action :create
   end
@@ -45,12 +46,14 @@ def create_temporary_files(template_top_level_files, test_config_path)
     variables new_resource.variables if new_resource.variables
     # Only create the temp files right now, don't run this later
     action :nothing
+    suppress_output true
   end
   resource.run_action :create_or_update
 end
 
 action :create_or_update do
   test_config_path = Dir.mktmpdir
+  # TODO: Put validation in its own method
   begin
     # These are template files but we want the real name
     top_level = top_level_config_files.map { |f| ::File.basename(f, '.erb') }

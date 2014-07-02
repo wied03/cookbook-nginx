@@ -30,6 +30,7 @@ action :create_or_update do
     resource = template avail do
       variables new_resource.variables if new_resource.variables
       source ::File.join(node.chef_environment, 'sites', "#{::File.basename(name)}.erb")
+      sensitive true if new_resource.suppress_output
     end
     resources << resource
     link_path = ::File.join(link_dir, template_without_extension)

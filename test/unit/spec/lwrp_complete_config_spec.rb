@@ -301,4 +301,42 @@ describe 'bsw_nginx::lwrp:complete_config' do
     # assert
     deleted_stuff.should == @open_tempfiles
   end
+
+  it 'suppresses output on temp files' do
+    # arrange
+    force_validation_to :pass
+    setup_mock_config_files 'nginx.conf'
+
+    # act
+    temp_lwrp_recipe <<-EOF
+      bsw_nginx_complete_config 'the config'
+    EOF
+
+    # assert
+    resource = @chef_run.find_resource 'template', '/tmp/temp_file_0/nginx.conf'
+    resource.should_not be_nil
+    resource.sensitive.should == true
+    resource = @chef_run.find_resource 'bsw_nginx_site_config', 'test site config'
+    resource.should_not be_nil
+    resource.suppress_output.should == true
+  end
+
+  it 'does not suppress output on the real files' do
+    # arrange
+    force_validation_to :pass
+    setup_mock_config_files 'nginx.conf'
+
+    # act
+    temp_lwrp_recipe <<-EOF
+      bsw_nginx_complete_config 'the config'
+    EOF
+
+    # assert
+    resource = @chef_run.find_resource 'template', '/etc/nginx/nginx.conf'
+    resource.should_not be_nil
+    resource.sensitive.should == false
+    resource = @chef_run.find_resource 'bsw_nginx_site_config', 'real site config'
+    resource.should_not be_nil
+    resource.suppress_output.should == false
+  end
 end
