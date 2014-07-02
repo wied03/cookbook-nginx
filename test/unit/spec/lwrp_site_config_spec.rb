@@ -35,12 +35,26 @@ describe 'bsw_nginx::lwrp:site_config' do
     temp_lwrp_recipe contents
   end
 
-  def stub_existing_sites(sites,base_path='/etc/nginx')
+  def stub_existing_sites(sites, base_path='/etc/nginx')
     # dir will always include this
     complete = ['.', '..'] + sites
     Dir.stub(:entries).and_call_original
-    Dir.stub(:entries).with(File.join(base_path,'sites-enabled')).and_return complete
-    Dir.stub(:entries).with(File.join(base_path,'sites-available')).and_return complete
+    Dir.stub(:entries).with(File.join(base_path, 'sites-enabled')).and_return complete
+    Dir.stub(:entries).with(File.join(base_path, 'sites-available')).and_return complete
+  end
+
+  it 'creates a directory for sites-available and sites-enabled' do
+    # arrange
+    stub_existing_sites []
+
+    # act
+    setup_recipe [], <<-EOF
+      bsw_nginx_site_config 'site config'
+    EOF
+
+    # assert
+    @chef_run.should create_directory '/etc/nginx/sites-enabled'
+    @chef_run.should create_directory '/etc/nginx/sites-available'
   end
 
   it 'sets updated if a template is updated' do
@@ -109,7 +123,7 @@ describe 'bsw_nginx::lwrp:site_config' do
 
     # act
     setup_recipe [], <<-EOF
-          bsw_nginx_site_config 'site config'
+      bsw_nginx_site_config 'site config'
     EOF
 
     # assert
@@ -275,5 +289,7 @@ describe 'bsw_nginx::lwrp:site_config' do
     expect(resource.source).to eq 'thestagingenv/sites/site1.erb'
     resource = @chef_run.find_resource('link', '/etc/other_dir/sites-enabled/site1')
     expect(resource.to).to eq('/etc/other_dir/sites-available/site1')
+    @chef_run.should create_directory '/etc/other_dir/sites-enabled'
+    @chef_run.should create_directory '/etc/other_dir/sites-available'
   end
 end
