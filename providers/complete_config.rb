@@ -21,19 +21,32 @@ def top_level_config_files
   end
 end
 
+def run_command(*args)
+  cmd = Mixlib::ShellOut.new(*args)
+  cmd.run_command
+  cmd.error!
+  cmd
+end
+
 def create_temporary_files(template_top_level_files, test_config_path)
   # These are template files but we want the real name
   template_top_level_files.each do |config|
     tmp_main_config_path = ::File.join(test_config_path, config)
-    env_aware_template tmp_main_config_path do
+    resource = env_aware_template tmp_main_config_path do
       variables new_resource.variables if new_resource.variables
+      # Only create the temp files right now, don't run this later
+      action :nothing
     end
+    resource.run_action :create
   end
 
-  bsw_nginx_site_config 'test site config' do
+  resource = bsw_nginx_site_config 'test site config' do
     base_path test_config_path
     variables new_resource.variables if new_resource.variables
+    # Only create the temp files right now, don't run this later
+    action :nothing
   end
+  resource.run_action :create_or_update
 end
 
 action :create_or_update do
@@ -45,18 +58,22 @@ action :create_or_update do
   end
   test_main_config = ::File.join(test_config_path, 'nginx.conf')
   create_temporary_files top_level, test_config_path
-  validation_command = "/usr/sbin/nginx -c #{test_main_config} -t"
+
+  begin
+    run_command "/usr/sbin/nginx -c #{test_main_config} -t"
+  ensure
+    ::FileUtils.rm_rf test_config_path
+  end
+
   resources_that_trigger_update = []
   top_level.each do |config|
     resource = env_aware_template ::File.join('/etc/nginx', config) do
-      only_if validation_command
       variables new_resource.variables if new_resource.variables
     end
     resources_that_trigger_update << resource
   end
 
   resource = bsw_nginx_site_config 'real site config' do
-    only_if validation_command
     variables new_resource.variables if new_resource.variables
   end
 

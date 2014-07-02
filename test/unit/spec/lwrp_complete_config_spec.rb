@@ -28,6 +28,14 @@ describe 'bsw_nginx::lwrp:complete_config' do
       @open_tempfiles << name
       name
     end
+    @stub_setup = nil
+    original_new = Mixlib::ShellOut.method(:new)
+    Mixlib::ShellOut.stub!(:new) do |*args|
+      cmd = original_new.call(*args)
+      cmd.stub!(:run_command)
+      @stub_setup.call(cmd) if @stub_setup
+      cmd
+    end
   }
 
   after(:each) {
@@ -43,7 +51,15 @@ describe 'bsw_nginx::lwrp:complete_config' do
   end
 
   def force_validation_to(option)
-    stub_command('/usr/sbin/nginx -c /tmp/temp_file_0/nginx.conf -t').and_return(option == :pass)
+    @stub_setup = lambda do |shell_out|
+      case shell_out.command
+        when '/usr/sbin/nginx -c /tmp/temp_file_0/nginx.conf -t'
+          stub = shell_out.stub!(:error!)
+          stub.and_raise("Expected validation failure") unless option == :pass
+        else
+          shell_out.stub(:error!).and_raise "Unexpected command #{shell_out.command}"
+      end
+    end
   end
 
   def stub_updated_by
@@ -83,18 +99,15 @@ describe 'bsw_nginx::lwrp:complete_config' do
     setup_mock_config_files 'nginx.conf'
 
     # act
-    temp_lwrp_recipe <<-EOF
-      bsw_nginx_complete_config 'the config'
-    EOF
+    action = lambda {
+      temp_lwrp_recipe <<-EOF
+        bsw_nginx_complete_config 'the config'
+      EOF
+    }
 
     # assert
-    @chef_run.should render_file '/tmp/temp_file_0/nginx.conf'
+    action.should raise_exception RuntimeError, 'bsw_nginx_complete_config[the config] (lwrp_gen::default line 1) had an error: RuntimeError: Expected validation failure'
     @chef_run.should_not render_file '/etc/nginx/nginx.conf'
-    resource = @chef_run.find_resource 'bsw_nginx_site_config', 'real site config'
-    resource.performed_actions.should be_empty
-    resource = @chef_run.find_resource 'bsw_nginx_site_config', 'test site config'
-    resource.should_not be_nil
-    resource.base_path.should == '/tmp/temp_file_0'
   end
 
   it 'works properly with more than 1 top level config file' do
@@ -254,19 +267,38 @@ describe 'bsw_nginx::lwrp:complete_config' do
 
   it 'cleans up temporary config files if validation passes' do
     # arrange
+    force_validation_to :pass
+    setup_mock_config_files 'nginx.conf'
+    deleted_stuff = []
+    FileUtils.stub(:rm_rf) do |dir|
+      deleted_stuff << dir
+    end
 
     # act
+    temp_lwrp_recipe <<-EOF
+      bsw_nginx_complete_config 'the config'
+    EOF
 
     # assert
-    pending 'Write this test'
+    deleted_stuff.should == @open_tempfiles
   end
 
   it 'cleans up temporary config files if validation fails' do
     # arrange
+    force_validation_to :fail
+    setup_mock_config_files 'nginx.conf'
+    deleted_stuff = []
+    FileUtils.stub(:rm_rf) do |dir|
+      deleted_stuff << dir
+    end
 
     # act
+    lambda { temp_lwrp_recipe <<-EOF
+      bsw_nginx_complete_config 'the config'
+    EOF
+    }.should raise_exception
 
     # assert
-    pending 'Write this test'
+    deleted_stuff.should == @open_tempfiles
   end
 end

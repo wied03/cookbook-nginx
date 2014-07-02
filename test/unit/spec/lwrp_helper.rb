@@ -19,7 +19,7 @@ module BswTech
         'thestagingenv'
       end
 
-      def temp_lwrp_recipe(contents,runner_options={})
+      def temp_lwrp_recipe(contents, runner_options={})
         create_temp_cookbook contents
         RSpec.configure do |config|
           config.cookbook_path = [*config.cookbook_path] << generated_cookbook_path
@@ -52,6 +52,11 @@ module BswTech
       end
 
       def cleanup
+        begin
+          FileUtils.unstub(:rm_rf)
+        rescue RSpec::Mocks::MockExpectationError
+          # might not be stubbed, but that's OK
+        end
         FileUtils.rm_rf generated_cookbook_path
       end
     end
