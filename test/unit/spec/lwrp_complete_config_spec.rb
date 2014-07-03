@@ -118,7 +118,24 @@ describe 'bsw_nginx::lwrp:complete_config' do
     @chef_run.should render_file '/etc/nginx/some.other.file'
   end
 
-  it 'works properly with variables' do
+  it 'works properly with default variables' do
+    # arrange
+    force_validation_to :pass
+    setup_mock_config_files 'nginx.conf'
+
+    # act
+    temp_lwrp_recipe <<-EOF
+      bsw_nginx_complete_config 'the config'
+    EOF
+
+    # assert
+    resource = @chef_run.find_resource 'template', '/etc/nginx/nginx.conf'
+    resource.variables.should == {:nginx_config_path => '/etc/nginx'}
+    resource = @chef_run.find_resource 'template', '/tmp/temp_file_0/nginx.conf'
+    resource.variables.should == {:nginx_config_path => '/tmp/temp_file_0'}
+  end
+
+  it 'works properly with specified variables' do
     # arrange
     force_validation_to :pass
     setup_mock_config_files 'nginx.conf'
@@ -131,15 +148,16 @@ describe 'bsw_nginx::lwrp:complete_config' do
     EOF
 
     # assert
-    verify_var = lambda do |resource_type, name|
+    verify_var = lambda do |resource_type, name, extra_vars|
+      expected_vars = {:stuff => 'foobar'}.merge(extra_vars || {})
       resource = @chef_run.find_resource resource_type, name
-      resource.variables.should == {:stuff => 'foobar'}
+      resource.variables.should == expected_vars
     end
 
-    verify_var['template', '/tmp/temp_file_0/nginx.conf']
-    verify_var['template', '/etc/nginx/nginx.conf']
-    verify_var['bsw_nginx_site_config', 'real site config']
-    verify_var['bsw_nginx_site_config', 'test site config']
+    verify_var['template', '/tmp/temp_file_0/nginx.conf', :nginx_config_path => '/tmp/temp_file_0']
+    verify_var['template', '/etc/nginx/nginx.conf', :nginx_config_path => '/etc/nginx']
+    verify_var['bsw_nginx_site_config', 'real site config', :nginx_config_path => '/etc/nginx']
+    verify_var['bsw_nginx_site_config', 'test site config', :nginx_config_path => '/tmp/temp_file_0']
   end
 
   it 'complains when there are no files in the templates directory' do

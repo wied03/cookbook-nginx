@@ -28,12 +28,17 @@ def run_command(*args)
   cmd
 end
 
+def get_variables(base_nginx_path)
+  {:nginx_config_path => base_nginx_path}.merge(@new_resource.variables || {})
+end
+
 def create_temporary_files(template_top_level_files, test_config_path)
   # These are template files but we want the real name
+  merged_variables = get_variables test_config_path
   template_top_level_files.each do |config|
     tmp_main_config_path = ::File.join(test_config_path, config)
     resource = env_aware_template tmp_main_config_path do
-      variables new_resource.variables if new_resource.variables
+      variables merged_variables
       # Only create the temp files right now, don't run this later
       action :nothing
       sensitive true
@@ -44,7 +49,7 @@ def create_temporary_files(template_top_level_files, test_config_path)
 
   resource = bsw_nginx_site_config 'test site config' do
     base_path test_config_path
-    variables new_resource.variables if new_resource.variables
+    variables merged_variables
     # Only create the temp files right now, don't run this later
     action :nothing
     suppress_output true
@@ -69,19 +74,20 @@ def validate_configuration(top_level_template_files)
 end
 
 action :create_or_update do
+  merged_variables = get_variables @new_resource.base_path
   top_level_template_files = top_level_config_files.map { |f| ::File.basename(f, '.erb') }
   validate_configuration(top_level_template_files)
 
   resources_that_trigger_update = []
   top_level_template_files.each do |config|
-    resource = env_aware_template ::File.join('/etc/nginx', config) do
-      variables new_resource.variables if new_resource.variables
+    resource = env_aware_template ::File.join(@new_resource.base_path, config) do
+      variables merged_variables
     end
     resources_that_trigger_update << resource
   end
 
   resource = bsw_nginx_site_config 'real site config' do
-    variables new_resource.variables if new_resource.variables
+    variables merged_variables
   end
 
   resources_that_trigger_update << resource
