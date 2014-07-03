@@ -59,64 +59,20 @@ describe 'bsw_nginx::lwrp:site_config' do
     @chef_run.should create_directory '/etc/nginx/sites-available'
   end
 
-  it 'sets updated if a template is updated' do
+  it 'does not show as updated when told to because inline resources will trigger this' do
     # arrange
     stub_existing_sites []
-    Chef::Resource::Template.any_instance.stub(:updated_by_last_action?).and_return true
-
-    # act
     setup_recipe 'site1', <<-EOF
-      bsw_nginx_site_config 'site config'
+      bsw_nginx_site_config 'site config' do
+        temporary_resource true
+      end
     EOF
-
-    # assert
     resource = @chef_run.find_resource 'bsw_nginx_site_config', 'site config'
-    expect(resource.updated_by_last_action?).to be true
-  end
+    # Force the underlying updated flag on before we try and retrieve this
+    resource.updated_by_last_action true
 
-  it 'sets updated if a link is updated' do
-    # arrange
-    stub_existing_sites []
-    Chef::Resource::Link.any_instance.stub(:updated_by_last_action?).and_return true
-
-    # act
-    setup_recipe 'site1', <<-EOF
-        bsw_nginx_site_config 'site config'
-    EOF
-
-    # assert
-    resource = @chef_run.find_resource 'bsw_nginx_site_config', 'site config'
-    expect(resource.updated_by_last_action?).to be true
-  end
-
-  it 'sets updated if a link is deleted' do
-    # arrange
-    stub_existing_sites ['site3', 'site4']
-    Chef::Resource::Link.any_instance.stub(:updated_by_last_action?).and_return true
-
-    # act
-    setup_recipe [], <<-EOF
-      bsw_nginx_site_config 'site config'
-    EOF
-
-    # assert
-    resource = @chef_run.find_resource 'bsw_nginx_site_config', 'site config'
-    expect(resource.updated_by_last_action?).to be true
-  end
-
-  it 'sets updated if a file is deleted' do
-    # arrange
-    stub_existing_sites ['site3', 'site4']
-    Chef::Resource::File.any_instance.stub(:updated_by_last_action?).and_return true
-
-    # act
-    setup_recipe [], <<-EOF
-      bsw_nginx_site_config 'site config'
-    EOF
-
-    # assert
-    resource = @chef_run.find_resource 'bsw_nginx_site_config', 'site config'
-    expect(resource.updated_by_last_action?).to be true
+    # act + assert
+    expect(resource.updated_by_last_action?).to be false
   end
 
   it 'works properly if no sites exist' do

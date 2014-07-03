@@ -27,9 +27,9 @@ action :create_or_update do
     template_without_extension = ::File.basename r, '.erb'
     avail = ::File.join(avail_dir, template_without_extension)
     valid_sites << template_without_extension
-    resource = template avail do
+    resource = env_aware_template avail do
       variables new_resource.variables if new_resource.variables
-      source ::File.join(node.chef_environment, 'sites', "#{::File.basename(name)}.erb")
+      source ::File.join('sites', "#{::File.basename(name)}.erb")
       sensitive true if new_resource.suppress_output
     end
     resources << resource
@@ -54,6 +54,4 @@ action :create_or_update do
     end
     resources << resource
   end
-
-  new_resource.updated_by_last_action(resources.any? {|r| r.updated_by_last_action?})
 end

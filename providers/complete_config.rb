@@ -37,6 +37,7 @@ def create_temporary_files(template_top_level_files, test_config_path)
       # Only create the temp files right now, don't run this later
       action :nothing
       sensitive true
+      temporary_resource true
     end
     resource.run_action :create
   end
@@ -47,6 +48,7 @@ def create_temporary_files(template_top_level_files, test_config_path)
     # Only create the temp files right now, don't run this later
     action :nothing
     suppress_output true
+    temporary_resource true
   end
   resource.run_action :create_or_update
 end
@@ -83,8 +85,4 @@ action :create_or_update do
   end
 
   resources_that_trigger_update << resource
-
-  # Easier to test
-  checker = BswTech::ComplexUpdateChecker.new
-  new_resource.updated_by_last_action(resources_that_trigger_update.any? { |r| checker.updated_by_last_action?(r) })
 end
