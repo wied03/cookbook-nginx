@@ -2,10 +2,6 @@
 require 'bundler/setup'
 
 namespace :style do
-  require 'rubocop/rake_task'
-  desc 'Run Ruby style checks'
-  RuboCop::RakeTask.new(:ruby)
-
   require 'foodcritic'
   desc 'Run Chef style checks'
   FoodCritic::Rake::LintTask.new(:chef)
@@ -30,7 +26,7 @@ RSpec::Core::RakeTask.new(:spec) do |t, args|
 end
 
 # The default rake task should just run it all
-task default: ['style', 'spec', 'integration']
+task default: ['spec']
 
 begin
   require 'kitchen/rake_tasks'
