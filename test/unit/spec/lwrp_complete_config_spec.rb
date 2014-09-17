@@ -3,7 +3,7 @@
 require_relative 'spec_helper'
 
 describe 'bsw_nginx::lwrp:complete_config' do
-  def setup_mock_config_files(other_files)
+  def setup_mock_config_files(other_files, draft_main_config_contents='')
     # Chef returns files in subdirectories as well
     files = ['sites/ignore.this']
     files = files + [*other_files]
@@ -14,17 +14,29 @@ describe 'bsw_nginx::lwrp:complete_config' do
       FileUtils.mkdir_p File.dirname(site_filename)
       FileUtils.touch site_filename
     end
+    original = File.method(:read)
+    allow(File).to receive(:read) do |filename|
+      if filename == File.join(@tmp_dir_within_project, 'temp_file_0', 'nginx.conf')
+        draft_main_config_contents
+      else
+        original[filename]
+      end
+    end
   end
 
   include BswTech::ChefSpec::LwrpTestHelper
 
   before {
     stub_resources
+    @tmp_dir_within_project = File.absolute_path(File.join(File.dirname(__FILE__), 'temp_gen'))
+    FileUtils.rm_rf @tmp_dir_within_project
     @open_tempfiles = []
     @written_to_files = {}
     Dir.stub(:mktmpdir) do
-      name = "/tmp/temp_file_#{@open_tempfiles.length}"
+      name = "#{@tmp_dir_within_project}/temp_file_#{@open_tempfiles.length}"
       @open_tempfiles << name
+      puts "Creating mock temp directory #{name}"
+      FileUtils.mkdir_p name
       name
     end
     @stub_setup = nil
@@ -38,6 +50,7 @@ describe 'bsw_nginx::lwrp:complete_config' do
   }
 
   after(:each) {
+    FileUtils.rm_rf @tmp_dir_within_project
     cleanup
   }
 
@@ -49,10 +62,12 @@ describe 'bsw_nginx::lwrp:complete_config' do
     'complete_config'
   end
 
-  def force_validation_to(option)
+  def force_validation_to(option, with_binary=:default)
     @stub_setup = lambda do |shell_out|
+      bin_path = with_binary
+      bin_path = '/usr/sbin/nginx' if with_binary == :default
       case shell_out.command
-        when '/usr/sbin/nginx -c /tmp/temp_file_0/nginx.conf -t'
+        when "#{bin_path} -c #{@tmp_dir_within_project}/temp_file_0/nginx.conf -t"
           stub = shell_out.stub!(:error!)
           stub.and_raise("Expected validation failure") unless option == :pass
         else
@@ -73,15 +88,67 @@ describe 'bsw_nginx::lwrp:complete_config' do
 
     # assert
     @chef_run.should_not render_file '/etc/nginx/ignore.this'
-    @chef_run.should_not render_file '/tmp/temp_file_0/ignore.this'
-    @chef_run.should render_file '/tmp/temp_file_0/nginx.conf'
+    @chef_run.should_not render_file "#{@tmp_dir_within_project}/temp_file_0/ignore.this"
+    @chef_run.should render_file "#{@tmp_dir_within_project}/temp_file_0/nginx.conf"
     @chef_run.should render_file '/etc/nginx/nginx.conf'
     resource = @chef_run.find_resource 'bsw_nginx_site_config', 'real site config'
     resource.should_not be_nil
     resource.base_path.should == '/etc/nginx'
     resource = @chef_run.find_resource 'bsw_nginx_site_config', 'test site config'
     resource.should_not be_nil
-    resource.base_path.should == '/tmp/temp_file_0'
+    resource.base_path.should == "#{@tmp_dir_within_project}/temp_file_0"
+  end
+
+  it 'allows customizing the nginx bin location' do
+    # arrange
+    force_validation_to :pass, '/usr/local/nginx'
+    setup_mock_config_files 'nginx.conf'
+
+    # act
+    temp_lwrp_recipe <<-EOF
+          bsw_nginx_complete_config 'the config'
+    EOF
+
+    # assert
+    @chef_run.should_not render_file '/etc/nginx/ignore.this'
+    @chef_run.should_not render_file "#{@tmp_dir_within_project}/temp_file_0/ignore.this"
+    @chef_run.should render_file "#{@tmp_dir_within_project}/temp_file_0/nginx.conf"
+    @chef_run.should render_file '/etc/nginx/nginx.conf'
+    resource = @chef_run.find_resource 'bsw_nginx_site_config', 'real site config'
+    resource.should_not be_nil
+    resource.base_path.should == '/etc/nginx'
+    resource = @chef_run.find_resource 'bsw_nginx_site_config', 'test site config'
+    resource.should_not be_nil
+    resource.base_path.should == "#{@tmp_dir_within_project}/temp_file_0"
+  end
+
+  it 'substitutes the PID file for a temporary file' do
+    # arrange
+    force_validation_to :pass
+    nginx_mock_config_contents = <<-EOF
+pid /some/pid/file;
+other stuff
+    EOF
+    setup_mock_config_files 'nginx.conf', nginx_mock_config_contents
+
+    # act
+    temp_lwrp_recipe <<-EOF
+      bsw_nginx_complete_config 'the config'
+    EOF
+
+    # assert
+    actual = File.open(File.join(@tmp_dir_within_project, 'temp_file_0', 'nginx.conf')).read
+    expect(actual).to eq ''
+    pending 'Write this test'
+  end
+
+  it 'substitutes the PID file with a lot of spaces in the config for a temporary file' do
+    # arrange
+
+    # act
+
+    # assert
+    pending 'Write this test'
   end
 
   it 'does not execute real config resources if validation fails' do
