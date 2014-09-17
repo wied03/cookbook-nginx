@@ -43,7 +43,7 @@ class Chef
         begin
           # These are template files but we want the real name
           unless top_level_template_files.include? 'nginx.conf.erb'
-            fail "You must have a top level nginx.conf file in your templates/default/env directory.  You only have #{top_level_template_files}"
+            fail "You must have a top level nginx.conf.erb file in your templates/default/env directory.  You only have #{top_level_template_files}"
           end
           create_temporary_files top_level_template_files, test_config_path
           pidfile = Tempfile.new('nginx_test.pid')

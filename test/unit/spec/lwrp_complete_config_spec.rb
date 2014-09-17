@@ -45,8 +45,10 @@ describe 'bsw_nginx::lwrp:complete_config' do
       name
     end
     original_rm = FileUtils.method(:rm_rf)
+    @deleted_stuff = []
     allow(FileUtils).to receive(:rm_rf) do |path|
       original_rm[path] unless path == @current_temp_dir
+      @deleted_stuff << path
     end
     @stub_setup = nil
     original_new = Mixlib::ShellOut.method(:new)
@@ -206,7 +208,7 @@ chefspec.local
   it 'works properly with specified variables' do
     # arrange
     force_validation_to :pass
-    setup_mock_config_files({:name => 'nginx.conf.erb', :content => 'the config file for <%= node.environment %> is <%= stuff %>'})
+    setup_mock_config_files({:name => 'nginx.conf.erb', :content => 'the config file for <%= node.environment %> is <%= @stuff %>'})
 
     # act
     temp_lwrp_recipe <<-EOF
@@ -234,13 +236,13 @@ chefspec.local
     }
 
     # assert
-    action.should raise_exception RuntimeError, 'bsw_nginx_complete_config[the config] (lwrp_gen::default line 1) had an error: RuntimeError: You must have a top level nginx.conf file in your templates/default/env directory.  You only have []'
+    action.should raise_exception RuntimeError, 'bsw_nginx_complete_config[the config] (lwrp_gen::default line 1) had an error: RuntimeError: You must have a top level nginx.conf.erb file in your templates/default/env directory.  You only have []'
   end
 
   it 'complains when there are files in the templates directory but not the main one' do
     # arrange
     force_validation_to :pass
-    setup_mock_config_files ['junk.config']
+    setup_mock_config_files({:name => 'junk.conf.erb', :content => 'the config file for <%= node.environment %> is <%= @stuff %>'})
 
     # act
     action = lambda {
@@ -252,34 +254,13 @@ chefspec.local
     }
 
     # assert
-    action.should raise_exception RuntimeError, 'bsw_nginx_complete_config[the config] (lwrp_gen::default line 1) had an error: RuntimeError: You must have a top level nginx.conf file in your templates/default/env directory.  You only have ["junk.config"]'
-  end
-
-  it 'creates resources with the temporary resource flag set' do
-    # arrange
-    force_validation_to :pass
-    setup_mock_config_files 'nginx.conf'
-
-    # act
-    temp_lwrp_recipe <<-EOF
-      bsw_nginx_complete_config 'the config'
-    EOF
-
-    # assert
-    resource = @chef_run.find_resource 'bsw_nginx_site_config', 'test site config'
-    resource.temporary_resource.should == true
-    resource = @chef_run.find_resource 'template', '/tmp/temp_file_0/nginx.conf'
-    resource.temporary_resource.should == true
+    action.should raise_exception RuntimeError, 'bsw_nginx_complete_config[the config] (lwrp_gen::default line 1) had an error: RuntimeError: You must have a top level nginx.conf.erb file in your templates/default/env directory.  You only have ["junk.conf.erb"]'
   end
 
   it 'cleans up temporary config files if validation passes' do
     # arrange
     force_validation_to :pass
-    setup_mock_config_files 'nginx.conf'
-    deleted_stuff = []
-    FileUtils.stub(:rm_rf) do |dir|
-      deleted_stuff << dir
-    end
+    setup_mock_config_files({:name => 'nginx.conf.erb', :content => 'the config file for <%= node.environment %>'})
 
     # act
     temp_lwrp_recipe <<-EOF
@@ -287,17 +268,13 @@ chefspec.local
     EOF
 
     # assert
-    deleted_stuff.should == @open_tempfiles
+    @deleted_stuff.should == @open_tempfiles
   end
 
   it 'cleans up temporary config files if validation fails' do
     # arrange
     force_validation_to :fail
-    setup_mock_config_files 'nginx.conf'
-    deleted_stuff = []
-    FileUtils.stub(:rm_rf) do |dir|
-      deleted_stuff << dir
-    end
+    setup_mock_config_files({:name => 'nginx.conf.erb', :content => 'the config file for <%= node.environment %>'})
 
     # act
     lambda { temp_lwrp_recipe <<-EOF
@@ -306,44 +283,6 @@ chefspec.local
     }.should raise_exception
 
     # assert
-    deleted_stuff.should == @open_tempfiles
-  end
-
-  it 'suppresses output on temp files' do
-    # arrange
-    force_validation_to :pass
-    setup_mock_config_files 'nginx.conf'
-
-    # act
-    temp_lwrp_recipe <<-EOF
-      bsw_nginx_complete_config 'the config'
-    EOF
-
-    # assert
-    resource = @chef_run.find_resource 'template', '/tmp/temp_file_0/nginx.conf'
-    resource.should_not be_nil
-    resource.sensitive.should == true
-    resource = @chef_run.find_resource 'bsw_nginx_site_config', 'test site config'
-    resource.should_not be_nil
-    resource.suppress_output.should == true
-  end
-
-  it 'does not suppress output on the real files' do
-    # arrange
-    force_validation_to :pass
-    setup_mock_config_files 'nginx.conf'
-
-    # act
-    temp_lwrp_recipe <<-EOF
-      bsw_nginx_complete_config 'the config'
-    EOF
-
-    # assert
-    resource = @chef_run.find_resource 'template', '/etc/nginx/nginx.conf'
-    resource.should_not be_nil
-    resource.sensitive.should == false
-    resource = @chef_run.find_resource 'bsw_nginx_site_config', 'real site config'
-    resource.should_not be_nil
-    resource.suppress_output.should == false
+    @deleted_stuff.should == @open_tempfiles
   end
 end
