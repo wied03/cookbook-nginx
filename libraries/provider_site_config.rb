@@ -17,10 +17,11 @@ class Chef
           next if ::File.extname(config_file) != '.erb'
           config_file_without_template_extension = ::File.basename config_file, '.erb'
           avail_site_target_file = ::File.join(available_sites_dir, config_file_without_template_extension)
+          our_resource = @new_resource
           env_aware_template avail_site_target_file do
-            variables @new_resource.variables if @new_resource.variables
+            variables our_resource.variables if our_resource.variables
             source ::File.join('sites', ::File.basename(config_file))
-            sensitive true if @new_resource.suppress_output
+            sensitive true if our_resource.suppress_output
           end
           link ::File.join(enabled_sites_link_dir, config_file_without_template_extension) do
             to avail_site_target_file
