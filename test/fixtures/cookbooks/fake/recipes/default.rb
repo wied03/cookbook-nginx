@@ -12,7 +12,14 @@ file '/var/www/my_app/current/public/index.html' do
   content 'hello world from bsw'
 end
 
-bsw_nginx_complete_config 'the config'
+file '/tmp/notify_test' do
+  action :nothing
+  content 'we got notified!'
+end
+
+bsw_nginx_complete_config 'the config' do
+  notifies :create, 'file[/tmp/notify_test]', :delayed
+end
 
 service 'nginx' do
   action [:enable, :start]

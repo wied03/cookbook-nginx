@@ -12,7 +12,7 @@ class Chef
         true
       end
 
-      def action_create_or_update
+      action :create_or_update do
         validate_configuration(top_level_config_files)
         merged_variables = get_variables @new_resource.base_path
         top_level_config_files.each do |config|

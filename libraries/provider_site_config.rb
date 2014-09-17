@@ -10,7 +10,7 @@ class Chef
         true
       end
 
-      def action_create_or_update
+      action :create_or_update do
         directory available_sites_dir
         directory enabled_sites_link_dir
 
