@@ -7,6 +7,7 @@ module BswTech
     end
 
     def write_with_variables(cookbook, source, variables, location)
+      FileUtils.mkdir_p location
       ctx = Chef::Mixin::Template::TemplateContext.new variables
       ctx[:node] = @run_context.node
       path = cookbook_template_location(source, cookbook)

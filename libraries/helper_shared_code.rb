@@ -2,18 +2,18 @@ module BswTech
   module Nginx
     module Shared
       def create_site_config_tmp_files(tmp_path)
-        avail_dir = ::File.join(tmp_path, 'sites-available')
+        available_link = ::File.join(tmp_path, 'sites-available')
         link_dir = ::File.join(tmp_path, 'sites-enabled')
-        directory avail_dir
+        directory available_link
         directory link_dir
 
-        get_site_config_files.each do |r|
-          next if ::File.extname(r) != '.erb'
-          template_without_extension = ::File.basename r, '.erb'
-          avail = ::File.join(avail_dir, template_without_extension)
-          write_temporary_template ::File.join('sites', "#{::File.basename(avail)}"), avail
-          link_path = ::File.join(link_dir, template_without_extension)
-          shell_out "ln -s #{link_path} #{avail}"
+        get_site_config_files.each do |config_file|
+          next if ::File.extname(config_file) != '.erb'
+          config_file_without_template_extension = ::File.basename config_file, '.erb'
+          write_temporary_template ::File.join('sites', "#{::File.basename(config_file)}"), available_link
+          link_path = ::File.join(link_dir, config_file_without_template_extension)
+          available_link_path = ::File.join(available_link, config_file_without_template_extension)
+          shell_out "ln -s #{link_path} #{available_link_path}"
         end
       end
 

@@ -87,7 +87,7 @@ describe 'bsw_nginx::lwrp:complete_config' do
     end
   end
 
-  it 'creates all resources with a valid config' do
+  it 'works with a valid config' do
     # arrange
     force_validation_to :pass
     setup_mock_config_files({:name => 'nginx.conf.erb', :content => 'the config file for <%= node.environment %>'})
@@ -100,6 +100,26 @@ describe 'bsw_nginx::lwrp:complete_config' do
     # assert
     @chef_run.should_not render_file '/etc/nginx/ignore.this'
     @chef_run.should render_file('/etc/nginx/nginx.conf').with_content 'the config file for thestagingenv'
+  end
+
+  it 'works with a valid config and sites' do
+    # arrange
+    force_validation_to :pass
+    setup_mock_config_files([
+                                {:name => 'nginx.conf.erb', :content => 'the config file for <%= node.environment %>'},
+                                {:name => 'sites/site1.conf.erb', :content => 'the site for <%= node.name %>'}
+                            ])
+
+    # act
+    temp_lwrp_recipe <<-EOF
+      bsw_nginx_complete_config 'the config'
+    EOF
+
+    # assert
+    @chef_run.should render_file('/etc/nginx/nginx.conf').with_content 'the config file for thestagingenv'
+    @chef_run.should render_file('/etc/nginx/sites-available/nginx.conf').with_content 'the site for thestagingenv'
+    # TODO: Test both permanent and temp link
+    pending 'Write this test'
   end
 
   it 'does not converge if validation fails' do
