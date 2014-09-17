@@ -4,6 +4,7 @@ class Chef
   class Provider
     class BswNginxCompleteConfig < Chef::Provider::LWRPBase
       include Chef::Mixin::ShellOut
+      include BswTech::Nginx::Shared
 
       use_inline_resources
 
@@ -49,17 +50,6 @@ class Chef
       def write_temporary_template(source_file, destination)
         temp = BswTech::ManualTemplate.new run_context
         temp.write_with_variables cookbook_name, source_file, @new_resource.variables, destination
-      end
-
-      def get_site_config_files
-        cookbook = run_context.cookbook_collection[@new_resource.cookbook_name]
-        sub_dir = ::File.join(node.environment, 'sites')
-        begin
-          return cookbook.relative_filenames_in_preferred_directory(node, :templates, sub_dir)
-        rescue Chef::Exceptions::FileNotFound
-          Chef::Log.warn 'No NGINX site config files were found!'
-          return []
-        end
       end
 
       def create_temporary_files(template_top_level_files, test_config_path)
