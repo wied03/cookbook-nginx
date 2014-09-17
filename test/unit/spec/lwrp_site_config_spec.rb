@@ -59,22 +59,6 @@ describe 'bsw_nginx::lwrp:site_config' do
     @chef_run.should create_directory '/etc/nginx/sites-available'
   end
 
-  it 'does not show as updated when told to because inline resources will trigger this' do
-    # arrange
-    stub_existing_sites []
-    setup_recipe 'site1', <<-EOF
-      bsw_nginx_site_config 'site config' do
-        temporary_resource true
-      end
-    EOF
-    resource = @chef_run.find_resource 'bsw_nginx_site_config', 'site config'
-    # Force the underlying updated flag on before we try and retrieve this
-    resource.updated_by_last_action true
-
-    # act + assert
-    expect(resource.updated_by_last_action?).to be false
-  end
-
   it 'works properly if no sites exist' do
     # arrange
     stub_existing_sites []

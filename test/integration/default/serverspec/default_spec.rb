@@ -2,6 +2,6 @@
 
 require_relative 'spec_helper'
 
-describe 'default' do
-  it { pending 'write some tests' }
+describe command('curl -s http://localhost') do
+  it { should return_stdout 'hello world from bsw' }
 end
