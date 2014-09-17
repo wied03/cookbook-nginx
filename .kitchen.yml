@@ -1,6 +1,8 @@
 ---
 driver:
   name: vagrant
+  synced_folders:
+   - [".", "/vagrant"]
   
 provisioner:
   name: chef_solo
@@ -10,5 +12,5 @@ platforms:
 
 suites:
   - name: default
-    run_list: recipe[nginx::default]
+    run_list: recipe[fake::default]
     attributes:
