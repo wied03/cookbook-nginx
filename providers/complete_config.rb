@@ -1,3 +1,5 @@
+require 'tempfile'
+
 def whyrun_supported?
   true
 end
@@ -67,9 +69,25 @@ def validate_configuration(top_level_template_files)
     end
     test_main_config = ::File.join(test_config_path, 'nginx.conf')
     create_temporary_files top_level_template_files, test_config_path
-    run_command "/usr/sbin/nginx -c #{test_main_config} -t"
+    pidfile = Tempfile.new('nginx_test.pid')
+    pidfile.close
+    # Our test will leave a PID hanging around with root ownership if we don't sub it in, this causes problems for SELinux machines
+    replace_pid_in_config_file test_main_config, pidfile.path
+    begin
+      run_command "/usr/sbin/nginx -c #{test_main_config} -t"
+    ensure
+      pidfile.unlink
+    end
   ensure
     ::FileUtils.rm_rf test_config_path
+  end
+end
+
+def replace_pid_in_config_file(config_file, pid_file_to_use)
+  config_bits = ::File.read(config_file)
+  config_bits.gsub!(/pid\s+\S+\s*;/, "pid #{pid_file_to_use};")
+  ::File.open config_file, 'w' do |file|
+    file << config_bits
   end
 end
 
