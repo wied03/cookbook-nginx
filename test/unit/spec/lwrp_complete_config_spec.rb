@@ -69,8 +69,8 @@ describe 'bsw_nginx::lwrp:complete_config' do
     'bsw_nginx'
   end
 
-  def lwrps_full
-    ['bsw_nginx_complete_config']
+  def lwrps_under_test
+    ['complete_config', 'site_config']
   end
 
   def force_validation_to(option, with_binary=:default)
@@ -117,9 +117,11 @@ describe 'bsw_nginx::lwrp:complete_config' do
 
     # assert
     @chef_run.should render_file('/etc/nginx/nginx.conf').with_content 'the config file for thestagingenv'
-    @chef_run.should render_file('/etc/nginx/sites-available/nginx.conf').with_content 'the site for thestagingenv'
-    # TODO: Test both permanent and temp link
-    pending 'Write this test'
+    @chef_run.should render_file('/etc/nginx/sites-available/site1.conf').with_content 'the site for chefspec.local'
+    @chef_run.should create_directory('/etc/nginx/sites-available')
+    @chef_run.should create_directory('/etc/nginx/sites-enabled')
+    @chef_run.should create_link('/etc/nginx/sites-enabled/site1.conf').with_to('/etc/nginx/sites-available/site1.conf')
+    expect(File.symlink?(File.join(@current_temp_dir, 'sites-enabled/site1.conf'))).to eq true
   end
 
   it 'does not converge if validation fails' do

@@ -4,7 +4,6 @@ class Chef
   class Provider
     class BswNginxCompleteConfig < Chef::Provider::LWRPBase
       include Chef::Mixin::ShellOut
-      include BswTech::Nginx::Shared
 
       use_inline_resources
 
@@ -21,12 +20,47 @@ class Chef
             variables merged_variables
           end
         end
+        our_resource = @new_resource
         bsw_nginx_site_config 'site config' do
           variables merged_variables
+          base_path our_resource.base_path
         end
       end
 
       private
+
+      def create_site_config_tmp_files(tmp_path)
+        available_link = ::File.join(tmp_path, 'sites-available')
+        link_dir = ::File.join(tmp_path, 'sites-enabled')
+        FileUtils.mkdir_p available_link
+        FileUtils.mkdir_p link_dir
+
+        get_site_config_files.each do |config_file|
+          next if ::File.extname(config_file) != '.erb'
+          site_source = ::File.join('sites', "#{::File.basename(config_file)}")
+          write_temporary_template site_source, available_link
+          site_file_without_erb_ext = ::File.basename config_file, '.erb'
+          link_path = ::File.join(link_dir, site_file_without_erb_ext)
+          available_link_path = ::File.join(available_link, site_file_without_erb_ext)
+          ::File.symlink available_link_path, link_path
+        end
+      end
+
+      def write_temporary_template(source_file, destination)
+        temp = BswTech::ManualTemplate.new run_context
+        temp.write_with_variables cookbook_name, source_file, @new_resource.variables, destination
+      end
+
+      def get_site_config_files
+        cookbook = run_context.cookbook_collection[@new_resource.cookbook_name]
+        sub_dir = ::File.join(node.environment, 'sites')
+        begin
+          return cookbook.relative_filenames_in_preferred_directory(node, :templates, sub_dir)
+        rescue Chef::Exceptions::FileNotFound
+          Chef::Log.warn 'No NGINX site config files were found!'
+          return []
+        end
+      end
 
       def create_temporary_files(template_top_level_files, test_config_path)
         # These are template files but we want the real name
