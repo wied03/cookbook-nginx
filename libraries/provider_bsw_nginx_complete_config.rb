@@ -4,6 +4,7 @@ class Chef
   class Provider
     class BswNginxCompleteConfig < Chef::Provider::LWRPBase
       include Chef::Mixin::ShellOut
+      include BswTech::Nginx::Shared
 
       use_inline_resources
 
@@ -12,23 +13,17 @@ class Chef
       end
 
       def action_create_or_update
+        validate_configuration(top_level_config_files)
         merged_variables = get_variables @new_resource.base_path
-        top_level_template_files = top_level_config_files.map { |f| ::File.basename(f, '.erb') }
-        validate_configuration(top_level_template_files)
-
-        resources_that_trigger_update = []
-        top_level_template_files.each do |config|
-          resource = env_aware_template ::File.join(@new_resource.base_path, config) do
+        top_level_config_files.each do |config|
+          without_erb = ::File.basename(config, '.erb')
+          env_aware_template ::File.join(@new_resource.base_path, without_erb) do
             variables merged_variables
           end
-          resources_that_trigger_update << resource
         end
-
-        resource = bsw_nginx_site_config 'real site config' do
+        bsw_nginx_site_config 'site config' do
           variables merged_variables
         end
-
-        resources_that_trigger_update << resource
       end
 
       private
@@ -36,44 +31,28 @@ class Chef
       def create_temporary_files(template_top_level_files, test_config_path)
         # These are template files but we want the real name
         merged_variables = get_variables test_config_path
-        template_top_level_files.each do |config|
-          tmp_main_config_path = ::File.join(test_config_path, config)
-          resource = env_aware_template tmp_main_config_path do
-            variables merged_variables
-            # Only create the temp files right now, don't run this later
-            action :nothing
-            sensitive true
-            temporary_resource true
-          end
-          resource.run_action :create
+        temp = BswTech::ManualTemplate.new run_context
+        template_top_level_files.each do |config_file|
+          temp.write_with_variables cookbook_name, config_file, merged_variables, test_config_path
         end
-
-        resource = bsw_nginx_site_config 'test site config' do
-          base_path test_config_path
-          variables merged_variables
-          # Only create the temp files right now, don't run this later
-          action :nothing
-          suppress_output true
-          temporary_resource true
-        end
-        resource.run_action :create_or_update
+        create_site_config_tmp_files test_config_path
       end
 
       def validate_configuration(top_level_template_files)
         test_config_path = Dir.mktmpdir
         begin
           # These are template files but we want the real name
-          unless top_level_template_files.include? 'nginx.conf'
+          unless top_level_template_files.include? 'nginx.conf.erb'
             fail "You must have a top level nginx.conf file in your templates/default/env directory.  You only have #{top_level_template_files}"
           end
-          test_main_config = ::File.join(test_config_path, 'nginx.conf')
           create_temporary_files top_level_template_files, test_config_path
           pidfile = Tempfile.new('nginx_test.pid')
           pidfile.close
           # Our test will leave a PID hanging around with root ownership if we don't sub it in, this causes problems for SELinux machines
+          test_main_config = ::File.join(test_config_path, 'nginx.conf')
           replace_pid_in_config_file test_main_config, pidfile.path
           begin
-            shell_out "/usr/sbin/nginx -c #{test_main_config} -t"
+            shell_out! "#{@new_resource.nginx_binary} -c #{test_main_config} -t"
           ensure
             pidfile.unlink
           end
