@@ -1,3 +1,6 @@
+# Test kitchen disables selinux by default but we need to ensure our stuff works properly with it
+include_recipe 'selinux::enforcing'
+
 package 'epel-release'
 
 package 'nginx' do
