@@ -2,10 +2,7 @@
 include_recipe 'selinux::enforcing'
 
 package 'epel-release'
-
-package 'nginx' do
-  source '/vagrant/nginx-1.6.1-0.1.bsw.rhel.x86_64.rpm'
-end
+package 'nginx'
 
 directory '/var/www/my_app/current/public' do
   recursive true

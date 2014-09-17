@@ -28,7 +28,6 @@ server {
 	# Make site accessible from http://localhost/
 	server_name localhost;
 
-    passenger_enabled on;
 	location / {
 	    if (-f $document_root/maintenance.html) {
 	        return 503;
