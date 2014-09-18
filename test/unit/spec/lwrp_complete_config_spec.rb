@@ -107,7 +107,7 @@ describe 'bsw_nginx::lwrp:complete_config' do
     force_validation_to :pass
     setup_mock_config_files([
                                 {:name => 'nginx.conf.erb', :content => 'the config file for <%= node.environment %>'},
-                                {:name => 'sites/site1.conf.erb', :content => 'the site for <%= node.name %>'}
+                                {:name => 'sites/site1.conf.erb', :content => 'the site for <%= node.name %> site name is <%= @site_name %>'}
                             ])
 
     # act
@@ -117,7 +117,7 @@ describe 'bsw_nginx::lwrp:complete_config' do
 
     # assert
     @chef_run.should render_file('/etc/nginx/nginx.conf').with_content 'the config file for thestagingenv'
-    @chef_run.should render_file('/etc/nginx/sites-available/site1.conf').with_content 'the site for chefspec.local'
+    @chef_run.should render_file('/etc/nginx/sites-available/site1.conf').with_content 'the site for chefspec.local site name is site1'
     @chef_run.should create_directory('/etc/nginx/sites-available')
     @chef_run.should create_directory('/etc/nginx/sites-enabled')
     @chef_run.should create_link('/etc/nginx/sites-enabled/site1.conf').with_to('/etc/nginx/sites-available/site1.conf')
@@ -230,7 +230,8 @@ chefspec.local
   it 'works properly with specified variables' do
     # arrange
     force_validation_to :pass
-    setup_mock_config_files({:name => 'nginx.conf.erb', :content => 'the config file for <%= node.environment %> is <%= @stuff %>'})
+    setup_mock_config_files([{:name => 'nginx.conf.erb', :content => 'the config file for <%= node.environment %> is <%= @stuff %>'},
+                             {:name => 'sites/site1.conf.erb', :content => 'the site for <%= node.name %> site name is <%= @site_name %> and stuff is <%= @stuff %>'}])
 
     # act
     temp_lwrp_recipe <<-EOF
@@ -241,6 +242,7 @@ chefspec.local
 
     # assert
     @chef_run.should render_file('/etc/nginx/nginx.conf').with_content 'the config file for thestagingenv is foobar'
+    @chef_run.should render_file('/etc/nginx/sites-available/site1.conf').with_content 'the site for chefspec.local site name is site1 and stuff is foobar'
   end
 
   it 'complains when there are no files in the templates directory' do

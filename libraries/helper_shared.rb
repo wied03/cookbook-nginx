@@ -11,6 +11,11 @@ module BswTech
           return []
         end
       end
+
+      def get_merged_variables(site_filename)
+        site_name = ::File.basename(site_filename, '.conf')
+        @new_resource.variables.merge({:site_name => site_name})
+      end
     end
   end
 end

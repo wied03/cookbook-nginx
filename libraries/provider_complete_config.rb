@@ -48,8 +48,9 @@ class Chef
       end
 
       def write_temporary_template(source_file, destination)
+        variables = get_merged_variables source_file
         temp = BswTech::ManualTemplate.new run_context
-        temp.write_with_variables cookbook_name, source_file, @new_resource.variables, destination
+        temp.write_with_variables cookbook_name, source_file, variables, destination
       end
 
       def create_temporary_files(template_top_level_files, test_config_path)

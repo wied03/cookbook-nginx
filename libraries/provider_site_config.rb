@@ -19,8 +19,9 @@ class Chef
           config_file_without_template_extension = ::File.basename config_file, '.erb'
           avail_site_target_file = ::File.join(available_sites_dir, config_file_without_template_extension)
           our_resource = @new_resource
+          merged_variables = get_merged_variables(avail_site_target_file)
           env_aware_template avail_site_target_file do
-            variables our_resource.variables if our_resource.variables
+            variables merged_variables
             source ::File.join('sites', ::File.basename(config_file))
             sensitive true if our_resource.suppress_output
           end

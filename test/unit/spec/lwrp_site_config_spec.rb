@@ -98,17 +98,17 @@ describe 'bsw_nginx::lwrp:site_config' do
     stub_existing_sites []
 
     # act
-    setup_recipe 'site1', <<-EOF
+    setup_recipe 'site1.conf', <<-EOF
         bsw_nginx_site_config 'site config'
     EOF
 
     # assert
     expect(@chef_run.find_resources('template')).to have(1).items
-    resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site1')
-    expect(resource.variables).to eq({})
-    expect(resource.source).to eq 'thestagingenv/sites/site1.erb'
-    resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site1')
-    expect(resource.to).to eq('/etc/nginx/sites-available/site1')
+    resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site1.conf')
+    expect(resource.variables).to eq({:site_name => 'site1'})
+    expect(resource.source).to eq 'thestagingenv/sites/site1.conf.erb'
+    resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site1.conf')
+    expect(resource.to).to eq('/etc/nginx/sites-available/site1.conf')
   end
 
   it 'works properly with variables and 1 site' do
@@ -116,7 +116,7 @@ describe 'bsw_nginx::lwrp:site_config' do
     stub_existing_sites []
 
     # act
-    setup_recipe 'site1', <<-EOF
+    setup_recipe 'site1.conf', <<-EOF
       bsw_nginx_site_config 'site config' do
         variables({:stuff => 'foobar'})
       end
@@ -124,11 +124,11 @@ describe 'bsw_nginx::lwrp:site_config' do
 
     # assert
     expect(@chef_run.find_resources('template')).to have(1).items
-    resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site1')
-    expect(resource.variables).to eq(:stuff => 'foobar')
-    expect(resource.source).to eq 'thestagingenv/sites/site1.erb'
-    resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site1')
-    expect(resource.to).to eq('/etc/nginx/sites-available/site1')
+    resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site1.conf')
+    expect(resource.variables).to eq(:stuff => 'foobar', :site_name => 'site1')
+    expect(resource.source).to eq 'thestagingenv/sites/site1.conf.erb'
+    resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site1.conf')
+    expect(resource.to).to eq('/etc/nginx/sites-available/site1.conf')
   end
 
   it 'works properly with multiple sites' do
@@ -136,29 +136,29 @@ describe 'bsw_nginx::lwrp:site_config' do
     stub_existing_sites []
 
     # act
-    setup_recipe ['site1', 'site2'], <<-EOF
+    setup_recipe ['site1.conf', 'site2.conf'], <<-EOF
       bsw_nginx_site_config 'site config'
     EOF
 
     # assert
     expect(@chef_run.find_resources('template')).to have(2).items
-    resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site1')
-    expect(resource.variables).to eq({})
-    expect(resource.source).to eq 'thestagingenv/sites/site1.erb'
-    resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site1')
-    expect(resource.to).to eq('/etc/nginx/sites-available/site1')
-    resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site2')
-    expect(resource.variables).to eq({})
-    resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site2')
-    expect(resource.to).to eq('/etc/nginx/sites-available/site2')
+    resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site1.conf')
+    expect(resource.variables).to eq({:site_name=> 'site1'})
+    expect(resource.source).to eq 'thestagingenv/sites/site1.conf.erb'
+    resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site1.conf')
+    expect(resource.to).to eq('/etc/nginx/sites-available/site1.conf')
+    resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site2.conf')
+    expect(resource.variables).to eq({:site_name => 'site2'})
+    resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site2.conf')
+    expect(resource.to).to eq('/etc/nginx/sites-available/site2.conf')
   end
 
   it 'replaces sites that exist already' do
     # arrange
-    stub_existing_sites ['site1', 'site2']
+    stub_existing_sites ['site1.conf', 'site2.conf']
 
     # act
-    setup_recipe ['site1', 'site2'], <<-EOF
+    setup_recipe ['site1.conf', 'site2.conf'], <<-EOF
       bsw_nginx_site_config 'site config'
     EOF
 
@@ -168,23 +168,23 @@ describe 'bsw_nginx::lwrp:site_config' do
     expect(@chef_run.find_resources('file')).to have(0).items
     # Only the create links should be used
     expect(@chef_run.find_resources('link')).to have(2).items
-    resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site1')
-    expect(resource.variables).to eq({})
-    expect(resource.source).to eq 'thestagingenv/sites/site1.erb'
-    resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site1')
-    expect(resource.to).to eq('/etc/nginx/sites-available/site1')
-    resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site2')
-    expect(resource.variables).to eq({})
-    resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site2')
-    expect(resource.to).to eq('/etc/nginx/sites-available/site2')
+    resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site1.conf')
+    expect(resource.variables).to eq({:site_name=> 'site1'})
+    expect(resource.source).to eq 'thestagingenv/sites/site1.conf.erb'
+    resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site1.conf')
+    expect(resource.to).to eq('/etc/nginx/sites-available/site1.conf')
+    resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site2.conf')
+    expect(resource.variables).to eq({:site_name=> 'site2'})
+    resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site2.conf')
+    expect(resource.to).to eq('/etc/nginx/sites-available/site2.conf')
   end
 
   it 'removes sites that are no longer configured' do
     # arrange
-    stub_existing_sites ['site3', 'site4']
+    stub_existing_sites ['site3.conf', 'site4.conf']
 
     # act
-    setup_recipe ['site1', 'site2'], <<-EOF
+    setup_recipe ['site1.conf', 'site2.conf'], <<-EOF
       bsw_nginx_site_config 'site config'
     EOF
 
@@ -194,22 +194,22 @@ describe 'bsw_nginx::lwrp:site_config' do
     expect(@chef_run.find_resources('file')).to have(2).items
     # should have 2 creates and 2 deletes
     expect(@chef_run.find_resources('link')).to have(4).items
-    resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site1')
-    expect(resource.variables).to eq({})
-    expect(resource.source).to eq 'thestagingenv/sites/site1.erb'
-    resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site1')
-    expect(resource.to).to eq('/etc/nginx/sites-available/site1')
-    resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site2')
-    expect(resource.variables).to eq({})
-    resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site2')
-    expect(resource.to).to eq('/etc/nginx/sites-available/site2')
-    resource = @chef_run.find_resource('file', '/etc/nginx/sites-available/site3')
+    resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site1.conf')
+    expect(resource.variables).to eq({:site_name=> 'site1'})
+    expect(resource.source).to eq 'thestagingenv/sites/site1.conf.erb'
+    resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site1.conf')
+    expect(resource.to).to eq('/etc/nginx/sites-available/site1.conf')
+    resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site2.conf')
+    expect(resource.variables).to eq({:site_name=> 'site2'})
+    resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site2.conf')
+    expect(resource.to).to eq('/etc/nginx/sites-available/site2.conf')
+    resource = @chef_run.find_resource('file', '/etc/nginx/sites-available/site3.conf')
     expect(resource.action).to eq [:delete]
-    resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site3')
+    resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site3.conf')
     expect(resource.action).to eq [:delete]
-    resource = @chef_run.find_resource('file', '/etc/nginx/sites-available/site4')
+    resource = @chef_run.find_resource('file', '/etc/nginx/sites-available/site4.conf')
     expect(resource.action).to eq [:delete]
-    resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site4')
+    resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site4.conf')
     expect(resource.action).to eq [:delete]
   end
 
@@ -218,7 +218,7 @@ describe 'bsw_nginx::lwrp:site_config' do
     stub_existing_sites [], '/etc/other_dir'
 
     # act
-    setup_recipe 'site1', <<-EOF
+    setup_recipe 'site1.conf', <<-EOF
       bsw_nginx_site_config 'site config' do
         base_path '/etc/other_dir'
       end
@@ -226,11 +226,11 @@ describe 'bsw_nginx::lwrp:site_config' do
 
     # assert
     expect(@chef_run.find_resources('template')).to have(1).items
-    resource = @chef_run.find_resource('template', '/etc/other_dir/sites-available/site1')
-    expect(resource.variables).to eq({})
-    expect(resource.source).to eq 'thestagingenv/sites/site1.erb'
-    resource = @chef_run.find_resource('link', '/etc/other_dir/sites-enabled/site1')
-    expect(resource.to).to eq('/etc/other_dir/sites-available/site1')
+    resource = @chef_run.find_resource('template', '/etc/other_dir/sites-available/site1.conf')
+    expect(resource.variables).to eq({:site_name=> 'site1'})
+    expect(resource.source).to eq 'thestagingenv/sites/site1.conf.erb'
+    resource = @chef_run.find_resource('link', '/etc/other_dir/sites-enabled/site1.conf')
+    expect(resource.to).to eq('/etc/other_dir/sites-available/site1.conf')
     @chef_run.should create_directory '/etc/other_dir/sites-enabled'
     @chef_run.should create_directory '/etc/other_dir/sites-available'
   end
@@ -245,17 +245,17 @@ describe 'bsw_nginx::lwrp:site_config' do
     Dir.stub(:exists?).with(avail).and_return false
 
     # act
-    setup_recipe 'site1', <<-EOF
+    setup_recipe 'site1.conf', <<-EOF
       bsw_nginx_site_config 'site config'
     EOF
 
     # assert
     expect(@chef_run.find_resources('template')).to have(1).items
-    resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site1')
-    expect(resource.variables).to eq({})
-    expect(resource.source).to eq 'thestagingenv/sites/site1.erb'
-    resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site1')
-    expect(resource.to).to eq('/etc/nginx/sites-available/site1')
+    resource = @chef_run.find_resource('template', '/etc/nginx/sites-available/site1.conf')
+    expect(resource.variables).to eq({:site_name=> 'site1'})
+    expect(resource.source).to eq 'thestagingenv/sites/site1.conf.erb'
+    resource = @chef_run.find_resource('link', '/etc/nginx/sites-enabled/site1.conf')
+    expect(resource.to).to eq('/etc/nginx/sites-available/site1.conf')
   end
 
   it 'suppresses output if told to do so' do
